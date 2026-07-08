@@ -32,6 +32,23 @@ Thesis/
    # Sync dependencies from pyproject.toml
    uv sync
 
+## Development & Running
+
+### Using Docker (Recommended)
+To run the full stack (Redis, Postgres/pgvector, backend, worker, frontend), use:
+
+```bash
+docker compose up --build
+```
+
+## Local Development
+
+Always use `uv` for running tasks to ensure consistency with the production environment:
+
+**Tests**:
+```bash
+uv run pytest tests/unit
+```
 
 #### Available CLI Flags
 
@@ -49,5 +66,5 @@ The system includes a generic CLI tool for fetching data from Alpha Vantage.
 Basic usage:
 
 ```bash
-python data_ingestion_scripts/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <TICKERS> --period <PERIOD>
+python data_scripts/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <TICKERS> --period <PERIOD>
 ```
