@@ -29,8 +29,8 @@ Thesis/
    # On Windows:
    .venv\Scripts\activate
 
-   # Sync dependencies from requirements.txt
-   uv pip install -r requirements.txt
+   # Sync dependencies from pyproject.toml
+   uv sync
 
 
 #### Available CLI Flags

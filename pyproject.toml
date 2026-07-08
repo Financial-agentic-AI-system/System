@@ -1,0 +1,65 @@
+[project]
+name = "multi-agent-financial-system"
+version = "0.1.0"
+description = "AI-driven investment analysis system using a Multi-Agent architecture"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "celery",
+    "redis",
+    "langgraph",
+    "langchain",
+    "langchain-google-genai",    # Dla Gemini
+    "langchain-google-vertexai", # Dla Vertex AI embeddings
+    "sqlalchemy",
+    "psycopg2-binary",
+    "pgvector",
+    "streamlit",
+    "pydantic",
+    "pydantic-settings",
+    "alpha-vantage",
+    "yfinance"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff"
+]
+
+# Konfiguracja środowiska narzędzia uv
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.3.0"
+]
+
+# Konfiguracja testów jednostkowych
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+pythonpath = ["."]
+addopts = "-v"
+
+# Konfiguracja lintera i formatera Ruff
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "datalake",
+    "notebooks"
+]
+
+[tool.ruff.lint]
+# E: pycodestyle, F: Pyflakes, I: isort (do sortowania importów)
+select = ["E", "F", "I"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
