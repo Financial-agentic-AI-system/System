@@ -1,8 +1,0 @@
-requests
-python-dotenv
-click
-pathlib
-pandas-datareader
-pandas<2.2.0
-setuptools
-yfinance
