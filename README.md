@@ -23,12 +23,6 @@ Thesis/
    # Create a virtual environment
    uv venv
 
-   # Activate the environment:
-   # On macOS/Linux:
-   source .venv/bin/activate 
-   # On Windows:
-   .venv\Scripts\activate
-
    # Sync dependencies from pyproject.toml
    uv sync
 

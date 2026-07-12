@@ -66,7 +66,6 @@ Local environment setup:
 
 ```bash
 uv venv
-source .venv/bin/activate
 uv sync
 ```
 

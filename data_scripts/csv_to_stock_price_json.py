@@ -18,22 +18,19 @@ def load_stock_csv(input_path: Path) -> pd.DataFrame:
     return df
 
 
-def save_stock_json(ticker: str, price_series: pd.Series, price_field: str, output_dir: Path) -> None:
+def save_stock_json(
+    ticker: str, price_series: pd.Series, price_field: str, output_dir: Path
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     reports = []
 
     for date, value in price_series.items():
         if pd.notna(value):
-            reports.append({
-                "date": date.strftime("%Y-%m-%d"),
-                price_field.lower(): str(value)
-            })
+            reports.append(
+                {"date": date.strftime("%Y-%m-%d"), price_field.lower(): str(value)}
+            )
 
-    payload = {
-        "symbol": ticker,
-        "period": "daily",
-        "reports": reports
-    }
+    payload = {"symbol": ticker, "period": "daily", "reports": reports}
 
     output_file = output_dir / f"{ticker}_daily.json"
     with output_file.open("w", encoding="utf-8") as f:
@@ -48,27 +45,27 @@ def save_stock_json(ticker: str, price_series: pd.Series, price_field: str, outp
     "input_file",
     default=DEFAULT_INPUT_FILE,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Path to the source CSV file with downloaded stock prices."
+    help="Path to the source CSV file with downloaded stock prices.",
 )
 @click.option(
     "--output-dir",
     "output_dir",
     default=OUTPUT_BASE_DIR,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Directory where per-stock JSON files will be written."
+    help="Directory where per-stock JSON files will be written.",
 )
 @click.option(
     "--tickers",
     "tickers",
     default=None,
-    help="Comma-separated list of tickers to export. By default all tickers are processed."
+    help="Comma-separated list of tickers to export. By default all tickers are processed.",
 )
 @click.option(
     "--price-field",
     "price_field",
     default="Close",
     type=click.Choice(["Open", "High", "Low", "Close", "Volume"], case_sensitive=False),
-    help="Which price field to export for each ticker."
+    help="Which price field to export for each ticker.",
 )
 def main(input_file: Path, output_dir: Path, tickers: str, price_field: str):
     """Convert a multi-ticker stock prices CSV into per-symbol JSON files."""
@@ -77,7 +74,9 @@ def main(input_file: Path, output_dir: Path, tickers: str, price_field: str):
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.map(lambda tup: (tup[0].strip(), tup[1].strip()))
     else:
-        raise click.ClickException("Expected a MultiIndex CSV with price type and ticker in headers.")
+        raise click.ClickException(
+            "Expected a MultiIndex CSV with price type and ticker in headers."
+        )
 
     available_tickers = sorted({ticker for _, ticker in df.columns})
     click.secho(f"Found tickers: {', '.join(available_tickers)}", fg="cyan")
@@ -88,15 +87,24 @@ def main(input_file: Path, output_dir: Path, tickers: str, price_field: str):
         requested = available_tickers
 
     for ticker in requested:
-        matched_cols = [col for col in df.columns if col[0].lower() == price_field.lower() and col[1].upper() == ticker]
+        matched_cols = [
+            col
+            for col in df.columns
+            if col[0].lower() == price_field.lower() and col[1].upper() == ticker
+        ]
         if not matched_cols:
-            click.secho(f"  -> WARNING: {ticker} with field {price_field} not found", fg="yellow")
+            click.secho(
+                f"  -> WARNING: {ticker} with field {price_field} not found",
+                fg="yellow",
+            )
             continue
 
         price_series = df[matched_cols[0]].copy()
         save_stock_json(ticker, price_series, price_field, output_dir)
 
-    click.secho("\nFinished converting CSV to per-stock JSON files.", fg="green", bold=True)
+    click.secho(
+        "\nFinished converting CSV to per-stock JSON files.", fg="green", bold=True
+    )
 
 
 if __name__ == "__main__":

@@ -12,24 +12,23 @@ API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 DEFAULT_TICKERS = "AAPL,MSFT,NVDA,JPM,GS,XOM,CAT,PG,WMT,JNJ"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
 
+
 def fetch_data(ticker: str, function_name: str) -> dict | None:
     click.echo(f"  Fetching: {function_name} for {ticker}...")
     param_name = "tickers" if function_name == "NEWS_SENTIMENT" else "symbol"
     url = f"https://www.alphavantage.co/query?function={function_name}&{param_name}={ticker}&apikey={API_KEY}"
-    
+
     response = requests.get(url)
     if response.status_code == 200:
         return response.json()
     return None
 
+
 def save_to_json(data: dict, ticker: str, function_name: str, period: str = "all"):
     """
     Saves data. If fundamental data, allows filtering by annual/quarterly.
     """
-    period_map = {
-        "annual": "annualReports",
-        "quarterly": "quarterlyReports"
-    }
+    period_map = {"annual": "annualReports", "quarterly": "quarterlyReports"}
 
     dir_path = OUTPUT_BASE_DIR / function_name
     dir_path.mkdir(parents=True, exist_ok=True)
@@ -38,7 +37,7 @@ def save_to_json(data: dict, ticker: str, function_name: str, period: str = "all
         data_to_save = {
             "symbol": data.get("symbol", ticker),
             "period": period,
-            "reports": data[period_map[period]]
+            "reports": data[period_map[period]],
         }
         file_path = dir_path / f"{ticker}_{period}.json"
     else:
@@ -50,11 +49,19 @@ def save_to_json(data: dict, ticker: str, function_name: str, period: str = "all
 
     click.secho(f"  -> Saved: {file_path.resolve()}", fg="green")
 
+
 @click.command()
-@click.option('--functions', '-f', required=True, help="API functions, e.g., INCOME_STATEMENT")
-@click.option('--tickers', '-t', default=DEFAULT_TICKERS, help="Tickers list")
-@click.option('--period', '-p', type=click.Choice(['annual', 'quarterly', 'all'], case_sensitive=False), 
-              default='all', help="Filter for fundamental data")
+@click.option(
+    "--functions", "-f", required=True, help="API functions, e.g., INCOME_STATEMENT"
+)
+@click.option("--tickers", "-t", default=DEFAULT_TICKERS, help="Tickers list")
+@click.option(
+    "--period",
+    "-p",
+    type=click.Choice(["annual", "quarterly", "all"], case_sensitive=False),
+    default="all",
+    help="Filter for fundamental data",
+)
 def main(functions: str, tickers: str, period: str):
     if not API_KEY:
         raise click.ClickException("Missing API key!")
@@ -70,10 +77,11 @@ def main(functions: str, tickers: str, period: str):
             if data and "Information" not in data and "Note" not in data:
                 save_to_json(data, ticker, func, period)
             elif data:
-                error_msg = data.get('Information', data.get('Note', 'API error'))
+                error_msg = data.get("Information", data.get("Note", "API error"))
                 click.secho(f"  -> WARNING: {error_msg}", fg="red")
 
-            time.sleep(15) 
+            time.sleep(15)
+
 
 if __name__ == "__main__":
     main()
