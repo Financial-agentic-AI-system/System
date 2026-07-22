@@ -12,8 +12,9 @@ This repo (`code/`) is one of two sibling repos under `Thesis/`:
   `/datalake` inside the `backend` container
 
 See @README.md for setup instructions, @docs/ARCHITECTURE.md for the full
-system diagram, and @docs/AGENTS.md for the exact debate protocol (round
-limit, termination condition).
+system diagram and REST/prediction contract, @docs/agents.md for the exact
+debate protocol (round limit, termination condition), and
+@docs/evaluation.md for the backtesting methodology.
 
 ## Tech stack
 
@@ -47,8 +48,10 @@ limit, termination condition).
 ## Critical rules
 
 - **IMPORTANT**: `src/transformer/` is a plain one-off script, never a Celery
-  task. It runs either via `BackgroundTasks` from `POST /update_data`, or
-  manually via `python -m src.transformer.transform --tickers AAPL,TSLA`.
+  task and never triggered by the backend. It's run manually by a developer:
+  `python -m src.transformer.transform --tickers AAPL,TSLA`. Same for data
+  ingestion (`data_scripts/*`) — there is no API endpoint for either; this is
+  a deliberate scope cut, not a gap (see `docs/ARCHITECTURE.md`).
 - **IMPORTANT**: agent prompts live in `src/agents/prompts/*.yaml` and are
   read through `prompt_loader.py`. Never hardcode a system prompt as a Python
   string inside `nodes.py`.
