@@ -21,6 +21,7 @@ from src.agents.state import (
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
 from src.db.session import get_session
 
+
 def fetch_fundamentals(
     session: Session, ticker: str, as_of_date: date, quarters: int = 40
 ) -> list[Fundamentals]:

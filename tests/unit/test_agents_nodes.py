@@ -74,9 +74,7 @@ def test_format_fundamentals_context_drops_none_and_formats_key_value():
 
 
 def test_format_fundamentals_context_empty():
-    assert (
-        nodes.format_fundamentals_context([]) == "No fundamentals data available."
-    )
+    assert nodes.format_fundamentals_context([]) == "No fundamentals data available."
 
 
 def test_format_macro_context_shows_latest_vs_earliest_trend():
@@ -87,7 +85,9 @@ def test_format_macro_context_shows_latest_vs_earliest_trend():
         MacroSeries(series_id="UNRATE", date=date(2025, 6, 1), value=4.0),
     ]
     result = nodes.format_macro_context(rows)
-    assert "GDP: 100.0 as of 2025-07-01 (was 80.0 on 2020-04-01, change +20.00)" in result
+    assert (
+        "GDP: 100.0 as of 2025-07-01 (was 80.0 on 2020-04-01, change +20.00)" in result
+    )
     # UNRATE has a single point in the window — no "was/change" clause.
     assert "UNRATE: 4.0 as of 2025-06-01" in result
     assert "UNRATE: 4.0 as of 2025-06-01 (was" not in result
@@ -107,7 +107,9 @@ def test_format_report_none_vs_value():
 
 def test_format_opinion_none_vs_value():
     assert nodes.format_opinion(None) == "(no opinion yet)"
-    opinion = PMOpinion(direction="HOLD", confidence=0.5, summary="mixed", arguments=["a", "b"])
+    opinion = PMOpinion(
+        direction="HOLD", confidence=0.5, summary="mixed", arguments=["a", "b"]
+    )
     rendered = nodes.format_opinion(opinion)
     assert "HOLD" in rendered
     assert "mixed" in rendered
@@ -127,7 +129,10 @@ def test_financial_agent_node_round1_uses_system_prompt(monkeypatch):
 
     fake_report = AgentReport(opinion="x", reasoning="y")
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_report, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_report,
+        raising=False,
     )
 
     result = nodes.financial_agent_node(_base_state(round_number=1))
@@ -147,7 +152,10 @@ def test_financial_agent_node_round2_uses_revision_prompt(monkeypatch):
 
     fake_report = AgentReport(opinion="x2", reasoning="y2")
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_report, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_report,
+        raising=False,
     )
 
     state = _base_state(
@@ -173,7 +181,10 @@ def test_sentiment_agent_node_round1_uses_system_prompt(monkeypatch):
 
     fake_report = AgentReport(opinion="x", reasoning="y")
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_report, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_report,
+        raising=False,
     )
 
     result = nodes.sentiment_agent_node(_base_state(round_number=1))
@@ -192,7 +203,10 @@ def test_macro_agent_node_round2_uses_revision_prompt(monkeypatch):
 
     fake_report = AgentReport(opinion="x", reasoning="y")
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_report, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_report,
+        raising=False,
     )
 
     state = _base_state(
@@ -214,9 +228,14 @@ def test_macro_agent_node_round2_uses_revision_prompt(monkeypatch):
 def test_pm_synthesize_node_first_round_uses_initial_prompt(monkeypatch):
     render_calls: list[dict] = []
     monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-    fake_opinion = PMOpinion(direction="BUY", confidence=0.8, summary="s", arguments=["a"])
+    fake_opinion = PMOpinion(
+        direction="BUY", confidence=0.8, summary="s", arguments=["a"]
+    )
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_opinion, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_opinion,
+        raising=False,
     )
 
     result = nodes.pm_synthesize_node(_base_state(round_number=1))
@@ -229,14 +248,21 @@ def test_pm_synthesize_node_first_round_uses_initial_prompt(monkeypatch):
 def test_pm_synthesize_node_later_round_uses_revision_prompt(monkeypatch):
     render_calls: list[dict] = []
     monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-    fake_opinion = PMOpinion(direction="SELL", confidence=0.6, summary="s2", arguments=["b"])
+    fake_opinion = PMOpinion(
+        direction="SELL", confidence=0.6, summary="s2", arguments=["b"]
+    )
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_opinion, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_opinion,
+        raising=False,
     )
 
     state = _base_state(
         round_number=2,
-        pm_opinion=PMOpinion(direction="BUY", confidence=0.8, summary="prev", arguments=["a"]),
+        pm_opinion=PMOpinion(
+            direction="BUY", confidence=0.8, summary="prev", arguments=["a"]
+        ),
         critic_feedback=CriticFeedback(agree=False, feedback="too optimistic"),
         active_agents=["macro"],
     )
@@ -249,17 +275,24 @@ def test_pm_synthesize_node_later_round_uses_revision_prompt(monkeypatch):
     assert call["kwargs"]["reasked_agents"] == "macro"
 
 
-def test_pm_select_next_agents_node_increments_round_and_sets_active_agents(monkeypatch):
+def test_pm_select_next_agents_node_increments_round_and_sets_active_agents(
+    monkeypatch,
+):
     render_calls: list[dict] = []
     monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
     fake_selection = NextAgentsSelection(agents=["macro"])
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_selection, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_selection,
+        raising=False,
     )
 
     state = _base_state(
         round_number=1,
-        pm_opinion=PMOpinion(direction="BUY", confidence=0.8, summary="s", arguments=["a"]),
+        pm_opinion=PMOpinion(
+            direction="BUY", confidence=0.8, summary="s", arguments=["a"]
+        ),
         critic_feedback=CriticFeedback(agree=False, feedback="check macro"),
     )
     result = nodes.pm_select_next_agents_node(state)
@@ -274,12 +307,17 @@ def test_critic_node_returns_feedback(monkeypatch):
     monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
     fake_feedback = CriticFeedback(agree=True, feedback="looks solid")
     monkeypatch.setattr(
-        llm_client, "generate_structured", lambda prompt, model: fake_feedback, raising=False
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: fake_feedback,
+        raising=False,
     )
 
     state = _base_state(
         round_number=1,
-        pm_opinion=PMOpinion(direction="BUY", confidence=0.8, summary="s", arguments=["a"]),
+        pm_opinion=PMOpinion(
+            direction="BUY", confidence=0.8, summary="s", arguments=["a"]
+        ),
     )
     result = nodes.critic_node(state)
 
@@ -293,7 +331,9 @@ def test_critic_node_returns_feedback(monkeypatch):
 def test_finalize_node_assembles_predict_result():
     state = _base_state(
         round_number=2,
-        pm_opinion=PMOpinion(direction="BUY", confidence=0.7, summary="s", arguments=["a"]),
+        pm_opinion=PMOpinion(
+            direction="BUY", confidence=0.7, summary="s", arguments=["a"]
+        ),
         critic_feedback=CriticFeedback(agree=True, feedback="ok"),
         financial_report=AgentReport(opinion="f-op", reasoning="f-r"),
         sentiment_report=AgentReport(opinion="s-op", reasoning="s-r"),

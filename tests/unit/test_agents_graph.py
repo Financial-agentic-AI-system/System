@@ -9,7 +9,9 @@ the agents the PM selects), matching what was verified manually before.
 
 from datetime import date
 
-from src.agents import llm_client
+import pytest
+
+from src.agents import llm_client, nodes
 from src.agents.graph import compiled_graph, route_after_critic, route_to_agents
 from src.agents.state import (
     AgentReport,
@@ -18,6 +20,24 @@ from src.agents.state import (
     NextAgentsSelection,
     PMOpinion,
 )
+
+
+class _FakeSessionCM:
+    def __enter__(self):
+        return None
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+@pytest.fixture(autouse=True)
+def _no_real_db(monkeypatch):
+    """None of these tests should ever touch Postgres — CI has no DB service."""
+    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
+    monkeypatch.setattr(nodes, "fetch_fundamentals", lambda *a, **k: [])
+    monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: [])
+    monkeypatch.setattr(nodes, "fetch_macro_series", lambda *a, **k: [])
+    monkeypatch.setattr(nodes, "fetch_recent_articles", lambda *a, **k: [])
 
 
 def _initial_state(**overrides) -> DebateState:
@@ -38,7 +58,9 @@ def _initial_state(**overrides) -> DebateState:
     return state
 
 
-def _make_fake_llm(*, critic_agrees_after: int, selected_agents: list[str] | None = None):
+def _make_fake_llm(
+    *, critic_agrees_after: int, selected_agents: list[str] | None = None
+):
     """critic_agrees_after=N: the critic disagrees on its first N calls, then
     agrees from call N+1 onward (0 means it agrees immediately)."""
     counts: dict[str, int] = {}
@@ -49,7 +71,9 @@ def _make_fake_llm(*, critic_agrees_after: int, selected_agents: list[str] | Non
         if output_model is AgentReport:
             return AgentReport(opinion="op", reasoning="rsn")
         if output_model is PMOpinion:
-            return PMOpinion(direction="BUY", confidence=0.6, summary="s", arguments=["a"])
+            return PMOpinion(
+                direction="BUY", confidence=0.6, summary="s", arguments=["a"]
+            )
         if output_model is CriticFeedback:
             agree = counts["CriticFeedback"] > critic_agrees_after
             return CriticFeedback(agree=agree, feedback="fb")
@@ -65,17 +89,23 @@ def _make_fake_llm(*, critic_agrees_after: int, selected_agents: list[str] | Non
 # route_after_critic / route_to_agents — pure, no graph execution needed
 # --------------------------------------------------------------------------- #
 def test_route_after_critic_finalizes_on_agreement():
-    state = _initial_state(round_number=1, critic_feedback=CriticFeedback(agree=True, feedback="ok"))
+    state = _initial_state(
+        round_number=1, critic_feedback=CriticFeedback(agree=True, feedback="ok")
+    )
     assert route_after_critic(state) == "finalize"
 
 
 def test_route_after_critic_continues_on_disagreement_within_round_limit():
-    state = _initial_state(round_number=1, critic_feedback=CriticFeedback(agree=False, feedback="no"))
+    state = _initial_state(
+        round_number=1, critic_feedback=CriticFeedback(agree=False, feedback="no")
+    )
     assert route_after_critic(state) == "pm_select_next_agents"
 
 
 def test_route_after_critic_finalizes_at_round_limit_regardless_of_agreement():
-    state = _initial_state(round_number=3, critic_feedback=CriticFeedback(agree=False, feedback="no"))
+    state = _initial_state(
+        round_number=3, critic_feedback=CriticFeedback(agree=False, feedback="no")
+    )
     assert route_after_critic(state) == "finalize"
 
 
