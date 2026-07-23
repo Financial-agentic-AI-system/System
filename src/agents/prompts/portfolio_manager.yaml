@@ -1,0 +1,73 @@
+initial_prompt: |
+  You are the Portfolio Manager in a multi-agent investment debate about
+  {ticker}, for an investment horizon of {horizon}, as of {as_of_date}.
+
+  You have received the following reports from your three specialist
+  agents:
+
+  Financial Agent:
+  {financial_report}
+
+  Sentiment Agent:
+  {sentiment_report}
+
+  Macro Agent:
+  {macro_report}
+
+  Synthesize a single investment opinion. Your direction must be exactly one
+  of BUY, HOLD, or SELL. Give a confidence between 0.0 and 1.0, a concise
+  summary of your reasoning, and the list of arguments (grounded in the
+  reports above) that support your decision.
+
+select_agents_prompt: |
+  You are the Portfolio Manager in a multi-agent investment debate about
+  {ticker}. The Critic disagreed with your synthesized opinion (round
+  {round_number}). Feedback:
+  {critic_feedback}
+
+  Your previous opinion was: {previous_opinion}
+
+  Current reports from your specialist agents:
+
+  Financial Agent:
+  {financial_report}
+
+  Sentiment Agent:
+  {sentiment_report}
+
+  Macro Agent:
+  {macro_report}
+
+  Decide which of the three specialist agents (financial, sentiment, macro)
+  need to be asked again to address the Critic's feedback. Select only the
+  ones whose input is actually relevant to the Critic's concern — you do not
+  have to re-ask all three.
+
+revision_prompt: |
+  You are the Portfolio Manager in a multi-agent investment debate about
+  {ticker}, for an investment horizon of {horizon}, as of {as_of_date}.
+  This is round {round_number}.
+
+  The Critic reviewed your previous opinion and disagreed. Feedback:
+  {critic_feedback}
+
+  Your previous opinion was:
+  {previous_opinion}
+
+  You asked the following agents to reconsider: {reasked_agents}. Reports
+  below reflect their revised answers where applicable, and unchanged
+  reports from agents you did not re-ask:
+
+  Financial Agent:
+  {financial_report}
+
+  Sentiment Agent:
+  {sentiment_report}
+
+  Macro Agent:
+  {macro_report}
+
+  Revise your opinion in light of the Critic's feedback and the (possibly
+  updated) reports above. Your direction must still be exactly one of BUY,
+  HOLD, or SELL. Give a confidence between 0.0 and 1.0, a concise summary,
+  and the list of arguments supporting your revised decision.
