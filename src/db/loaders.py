@@ -187,9 +187,7 @@ def iter_article_summaries(raw_data: Path) -> Iterator[dict]:
                 "symbol": symbol,
                 "title": article.get("title"),
                 "url": url,
-                "time_published": parse_time_published(
-                    article.get("time_published")
-                ),
+                "time_published": parse_time_published(article.get("time_published")),
                 "source": article.get("source"),
                 "summary": article.get("summary"),
                 "overall_sentiment_score": _to_float(
@@ -239,9 +237,7 @@ def _upsert(
         return 0
     table = model.__table__
     update_cols = [
-        c.name
-        for c in table.columns
-        if c.name not in conflict_cols and c.name != "id"
+        c.name for c in table.columns if c.name not in conflict_cols and c.name != "id"
     ]
     total = 0
     for start in range(0, len(rows), batch_size):

@@ -25,14 +25,14 @@ Examples:
     python fetch_article_summaries.py --start 2025-01 --end 2026-06 --chunk-months 3
 """
 
-import json
-import time
-import os
 import calendar
+import json
+import os
+import time
 from pathlib import Path
 
-import requests
 import click
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -54,7 +54,9 @@ AV_SLEEP = 1
 def _get_json(params: dict):
     """GET to Alpha Vantage, returns JSON or None on error."""
     try:
-        resp = requests.get(AV_BASE, params={**params, "apikey": AV_API_KEY}, timeout=30)
+        resp = requests.get(
+            AV_BASE, params={**params, "apikey": AV_API_KEY}, timeout=30
+        )
     except requests.RequestException as exc:
         click.secho(f"  -> REQUEST ERROR: {exc}", fg="red")
         return None
@@ -80,8 +82,9 @@ def av_error(data) -> str | None:
 # ----------------------------------------------------------------------------- #
 # Time windows (workaround for the 1000-articles-per-request limit)
 # ----------------------------------------------------------------------------- #
-def date_windows(start_year: int, start_month: int,
-                 end_year: int, end_month: int, chunk_months: int):
+def date_windows(
+    start_year: int, start_month: int, end_year: int, end_month: int, chunk_months: int
+):
     """Yields (time_from, time_to) in AV format: YYYYMMDDTHHMM."""
     y, m = start_year, start_month
     while (y < end_year) or (y == end_year and m <= end_month):
@@ -104,21 +107,32 @@ def date_windows(start_year: int, start_month: int,
 # ----------------------------------------------------------------------------- #
 # Fetcher
 # ----------------------------------------------------------------------------- #
-def fetch_news_feed(ticker: str, start_year: int, start_month: int,
-                    end_year: int, end_month: int, chunk_months: int) -> list:
+def fetch_news_feed(
+    ticker: str,
+    start_year: int,
+    start_month: int,
+    end_year: int,
+    end_month: int,
+    chunk_months: int,
+) -> list:
     """Fetches the NEWS_SENTIMENT feed for the whole range, by windows, deduped by URL."""
     feed, seen = [], set()
-    for time_from, time_to in date_windows(start_year, start_month,
-                                           end_year, end_month, chunk_months):
-        click.echo(f"  Fetching: NEWS_SENTIMENT {ticker} [{time_from[:8]}-{time_to[:8]}]...")
-        data = _get_json({
-            "function": "NEWS_SENTIMENT",
-            "tickers": ticker,
-            "time_from": time_from,
-            "time_to": time_to,
-            "sort": "EARLIEST",
-            "limit": 1000,
-        })
+    for time_from, time_to in date_windows(
+        start_year, start_month, end_year, end_month, chunk_months
+    ):
+        click.echo(
+            f"  Fetching: NEWS_SENTIMENT {ticker} [{time_from[:8]}-{time_to[:8]}]..."
+        )
+        data = _get_json(
+            {
+                "function": "NEWS_SENTIMENT",
+                "tickers": ticker,
+                "time_from": time_from,
+                "time_to": time_to,
+                "sort": "EARLIEST",
+                "limit": 1000,
+            }
+        )
         err = av_error(data)
         if err:
             click.secho(f"  -> WARNING: {err}", fg="red")
@@ -136,9 +150,15 @@ def fetch_news_feed(ticker: str, start_year: int, start_month: int,
 # Transforms / filters
 # ----------------------------------------------------------------------------- #
 def _ticker_relevance(item: dict, ticker: str) -> float:
-    ts = next((t for t in item.get("ticker_sentiment", []) if t.get("ticker") == ticker), {})
+    ts = next(
+        (t for t in item.get("ticker_sentiment", []) if t.get("ticker") == ticker), {}
+    )
     try:
-        return float(ts.get("relevance_score")) if ts.get("relevance_score") is not None else 0.0
+        return (
+            float(ts.get("relevance_score"))
+            if ts.get("relevance_score") is not None
+            else 0.0
+        )
     except (TypeError, ValueError):
         return 0.0
 
@@ -151,19 +171,24 @@ def extract_summaries(feed: list, ticker: str) -> list:
     """Returns a LIST of article summaries from the (already filtered) feed."""
     articles = []
     for item in feed:
-        ts = next((t for t in item.get("ticker_sentiment", []) if t.get("ticker") == ticker), {})
-        articles.append({
-            "title": item.get("title"),
-            "url": item.get("url"),
-            "time_published": item.get("time_published"),
-            "source": item.get("source"),
-            "summary": item.get("summary"),
-            "overall_sentiment_score": item.get("overall_sentiment_score"),
-            "overall_sentiment_label": item.get("overall_sentiment_label"),
-            "ticker_sentiment_score": ts.get("ticker_sentiment_score"),
-            "ticker_sentiment_label": ts.get("ticker_sentiment_label"),
-            "relevance_score": ts.get("relevance_score"),
-        })
+        ts = next(
+            (t for t in item.get("ticker_sentiment", []) if t.get("ticker") == ticker),
+            {},
+        )
+        articles.append(
+            {
+                "title": item.get("title"),
+                "url": item.get("url"),
+                "time_published": item.get("time_published"),
+                "source": item.get("source"),
+                "summary": item.get("summary"),
+                "overall_sentiment_score": item.get("overall_sentiment_score"),
+                "overall_sentiment_label": item.get("overall_sentiment_label"),
+                "ticker_sentiment_score": ts.get("ticker_sentiment_score"),
+                "ticker_sentiment_label": ts.get("ticker_sentiment_label"),
+                "relevance_score": ts.get("relevance_score"),
+            }
+        )
     return articles
 
 
@@ -195,13 +220,22 @@ def parse_ym(s: str):
 
 
 @click.command()
-@click.option("--tickers", "-t", default=DEFAULT_TICKERS, help="Comma-separated list of tickers")
+@click.option(
+    "--tickers", "-t", default=DEFAULT_TICKERS, help="Comma-separated list of tickers"
+)
 @click.option("--start", default="2025-01", help="Range start in YYYY-MM format")
-@click.option("--end", default="2026-06", help="Range end in YYYY-MM format (inclusive)")
-@click.option("--min-relevance", default=0.9, type=float,
-              help="relevance_score threshold (0 = no filter)")
-@click.option("--chunk-months", default=3, type=int,
-              help="Time window size in months (3=quarter)")
+@click.option(
+    "--end", default="2026-06", help="Range end in YYYY-MM format (inclusive)"
+)
+@click.option(
+    "--min-relevance",
+    default=0.9,
+    type=float,
+    help="relevance_score threshold (0 = no filter)",
+)
+@click.option(
+    "--chunk-months", default=3, type=int, help="Time window size in months (3=quarter)"
+)
 def main(tickers, start, end, min_relevance, chunk_months):
     if not AV_API_KEY:
         raise click.ClickException("Missing ALPHA_VANTAGE_API_KEY in .env")
@@ -215,8 +249,9 @@ def main(tickers, start, end, min_relevance, chunk_months):
 
     for ticker in ticker_list:
         click.secho(f"--- Stock: {ticker} ---", fg="cyan", bold=True)
-        feed = fetch_news_feed(ticker, start_year, start_month,
-                               end_year, end_month, chunk_months)
+        feed = fetch_news_feed(
+            ticker, start_year, start_month, end_year, end_month, chunk_months
+        )
         feed = filter_by_relevance(feed, ticker, min_relevance)
         click.echo(f"  Articles after filter (relevance>={min_relevance}): {len(feed)}")
         articles = extract_summaries(feed, ticker)

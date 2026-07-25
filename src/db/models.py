@@ -48,9 +48,7 @@ class StockPrice(Base):
     """A daily closing price."""
 
     __tablename__ = "stock_prices"
-    __table_args__ = (
-        UniqueConstraint("symbol", "date", name="uq_stock_price_key"),
-    )
+    __table_args__ = (UniqueConstraint("symbol", "date", name="uq_stock_price_key"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     symbol: Mapped[str] = mapped_column(String(16), index=True)
@@ -62,9 +60,7 @@ class ArticleSummary(Base):
     """A news article summary with sentiment scores."""
 
     __tablename__ = "article_summaries"
-    __table_args__ = (
-        UniqueConstraint("symbol", "url", name="uq_article_key"),
-    )
+    __table_args__ = (UniqueConstraint("symbol", "url", name="uq_article_key"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     symbol: Mapped[str] = mapped_column(String(16), index=True)
@@ -84,9 +80,7 @@ class MacroSeries(Base):
     """A single point of a FRED macro series (series_id + date -> value)."""
 
     __tablename__ = "macro_series"
-    __table_args__ = (
-        UniqueConstraint("series_id", "date", name="uq_macro_key"),
-    )
+    __table_args__ = (UniqueConstraint("series_id", "date", name="uq_macro_key"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     series_id: Mapped[str] = mapped_column(String(32), index=True)
