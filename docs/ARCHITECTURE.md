@@ -53,6 +53,11 @@ exists only for the Sentiment agent, which needs to find the news articles
 *relevant* to a ticker/question out of free-text `article_summaries` —
 that's the one case where embeddings genuinely earn their complexity.
 
+**Note — retriever query strategy:** the Sentiment agent's semantic search
+runs 3 distinct queries (not one) against the embedded `article_summaries`,
+and aggregates their results into the sentiment context — not yet decided
+which 3 or how the aggregation dedupes/ranks across them.
+
 ## 2. Components
 
 | Component | Responsibility | Code | Status |
