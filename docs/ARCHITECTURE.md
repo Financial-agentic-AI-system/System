@@ -59,7 +59,7 @@ that's the one case where embeddings genuinely earn their complexity.
 | --- | --- | --- | --- |
 | Frontend | Streamlit UI, talks to backend over REST | `frontend/app.py` | scaffold (empty) |
 | Backend Server | FastAPI, 3 REST endpoints (§4) | `src/api/v1/` | scaffold (empty) |
-| Message Broker & Agent Cache | Redis — Celery broker/backend + live debate/agent status | `src/cache/` | not started |
+| Message Broker & Agent Cache | Redis — Celery broker/backend + live debate status/history. Cache only, not persisted — a restarted Redis loses in-progress and past debate transcripts; only the final prediction (Postgres, if/when added) would survive that | `src/cache/` | not started |
 | Celery Worker | Runs the LangGraph debate, the only Celery worker in the system | `src/worker/` | scaffold (`test_task` only) |
 | Agents (graph) | PM, Critic, Financial/Sentiment/Macro agents, debate protocol | `src/agents/` | scaffold (empty) — see `docs/agents.md` for the protocol spec |
 | Retriever | LangChain semantic search over pgvector — Sentiment agent only | `src/retriever/` | scaffold (empty) |
@@ -99,8 +99,8 @@ flowchart TD
 | --- | --- | --- |
 | `POST` | `/api/v1/predict/start` | Enqueue a debate. Body: `{"ticker": "TSLA", "horizon": "1W"}` → returns `task_id` |
 | `GET` | `/api/v1/predict/result/{task_id}` | Poll/fetch the final prediction (§5) |
-| `GET` | `/api/v1/debate_status/{debate_id}` | Live status of an in-progress debate (round number, which agents are active) |
-| `GET` | `/api/v1/history/{task_id}` | Full historical transcript of a past debate |
+| `GET` | `/api/v1/debate_status/{task_id}` | Live status of an in-progress debate (round number, which agents are active) |
+| `GET` | `/api/v1/history/{task_id}` | Full transcript of the debate so far (or of a just-finished one) |
 
 Data ingestion has no endpoint by design (see note in §1) — a developer runs
 `data_scripts/*` and the transformer manually.
@@ -146,6 +146,20 @@ this if the thesis scope explicitly requires price targets.
 
 `as_of_date` and `model_version` are not cosmetic — both are required inputs
 to the backtest methodology in `docs/evaluation.md`.
+
+## 6. Live debate status & history — key mechanism
+
+`DebateState` (§3) already carries everything worth exposing
+(`round_number`, `active_agents`, each agent's report, `pm_opinion`,
+`critic_feedback`) — no changes needed in `src/agents/`. The feature hinges
+on one architectural choice: the Celery worker must run the graph with
+LangGraph's `.stream(state, stream_mode="updates")` instead of `.invoke()`.
+`.invoke()` blocks until the whole debate finishes and returns only the
+final state; `.stream()` yields one state delta per superstep as the debate
+progresses, which is what makes a live view possible at all. The worker
+publishes each delta to Redis as it goes; the status/history endpoints (§4)
+are then just reads off that cache (see §2 — cache only, not a permanent
+store).
 
 ## Related docs
 
