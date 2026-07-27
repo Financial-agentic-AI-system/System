@@ -1,6 +1,7 @@
 import datetime
-import click
 from pathlib import Path
+
+import click
 import pandas_datareader.data as web
 
 DEFAULT_SERIES = "FEDFUNDS,GDP,CPIAUCSL,PPIACO,T10Y2Y,DGS10"

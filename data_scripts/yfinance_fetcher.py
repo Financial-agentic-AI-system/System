@@ -1,6 +1,7 @@
 import datetime
-import click
 from pathlib import Path
+
+import click
 import yfinance as yf
 
 DEFAULT_TICKERS = "AAPL,NVDA,GS,CAT,TSLA,META,NFLX,SMCI,META,INTC"
@@ -37,7 +38,7 @@ def fetch_stock_data(
         )
 
         if data.empty:
-            click.secho(f"  -> WARNING: No data retrieved", fg="yellow")
+            click.secho("  -> WARNING: No data retrieved", fg="yellow")
             return {}
 
         return data
@@ -131,11 +132,11 @@ def main(
     if not data.empty:
         save_to_csv(data, output)
 
-        click.secho(f"\n✓ Data fetched successfully!", fg="green", bold=True)
+        click.secho("\n✓ Data fetched successfully!", fg="green", bold=True)
         click.echo(f"  Records: {len(data)}")
         click.echo(f"  Columns: {list(data.columns)}")
     else:
-        click.secho(f"\n✗ Failed to fetch data", fg="red", bold=True)
+        click.secho("\n✗ Failed to fetch data", fg="red", bold=True)
 
 
 if __name__ == "__main__":

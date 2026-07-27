@@ -1,6 +1,5 @@
-from pathlib import Path
-
 import importlib
+from pathlib import Path
 
 
 def test_project_structure_is_present():
