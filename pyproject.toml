@@ -19,7 +19,8 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "alpha-vantage",
-    "yfinance"
+    "yfinance",
+    "click"
 ]
 
 [project.optional-dependencies]

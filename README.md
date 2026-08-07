@@ -62,3 +62,10 @@ Basic usage:
 ```bash
 python data_scripts/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <TICKERS> --period <PERIOD>
 ```
+#### Loading data into db
+
+In order to load data into db use: 
+```bash
+uv run python -n src.db.load
+```
+This command will create tables and load data directly from Datalake.
