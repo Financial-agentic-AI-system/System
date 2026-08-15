@@ -96,7 +96,9 @@ Run unit tests:
 uv run pytest tests/unit
 ```
 
-Lint and format (run both before committing):
+Lint and format (also enforced automatically on commit via the
+`pre-commit` git hook — see `.pre-commit-config.yaml`; run
+`uv run pre-commit install` once after cloning):
 
 ```bash
 uv run ruff check .
