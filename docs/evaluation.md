@@ -102,14 +102,15 @@ e.g. `us-central1-aiplatform.googleapis.com`, rather than a wildcard on
 | Field | Value |
 | --- | --- |
 | Backtest window | 2025-01-01 → mid-2026 |
-| Model + version | TBD |
-| Required model training cutoff | before 2025-01-01 (constraint, not yet matched to a specific model) |
+| Model + version | Llama 3.3 70B Instruct — `meta/llama-3.3-70b-instruct-maas`, served as MaaS on Gemini Enterprise Agent Platform (`src/agents/llm_client.py`) |
+| Required model training cutoff | before 2025-01-01 — satisfied: Meta's official Llama 3.3 model card lists a training data cutoff of **December 2023** |
 
 Record this triple together per backtest run, not independently — it's
 already captured per-prediction in the `model_version` / `as_of_date` fields
 of the prediction contract (`docs/ARCHITECTURE.md` §5), so results stay
-reproducible and auditable after the fact. Once a model is chosen, fill in
-this table and confirm its cutoff satisfies the constraint above.
+reproducible and auditable after the fact.
+
+
 
 ## 4. Baselines and metrics
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 import yfinance as yf
 
-DEFAULT_TICKERS = "AAPL,NVDA,GS,CAT,TSLA,META,NFLX,SMCI,META,INTC"
+DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
 
 

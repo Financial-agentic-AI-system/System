@@ -19,7 +19,10 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "alpha-vantage",
-    "yfinance"
+    "yfinance",
+    "click",
+    "google-auth",  # ADC auth for src/agents/llm_client.py (MaaS REST calls)
+    "requests"      # src/agents/llm_client.py MaaS REST calls
 ]
 
 [project.optional-dependencies]

@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-DEFAULT_TICKERS = "AAPL,MSFT,NVDA,JPM,GS,XOM,CAT,PG,WMT,JNJ"
+DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
 
 

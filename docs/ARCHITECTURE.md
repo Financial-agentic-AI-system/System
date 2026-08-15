@@ -72,7 +72,7 @@ which 3 or how the aggregation dedupes/ranks across them.
 | DB (Postgres/pgvector) | Relational storage + vector store; Financial/Macro agents query it directly via SQL | `src/db/` | **done, tested** (`tests/unit/test_db_loaders.py`) |
 | data_fetcher | Fetches market/fundamental/sentiment data from Alpha Vantage into the datalake — manual/dev-only, never triggered by the backend | `data_scripts/` | done (one-off CLI scripts) |
 | datalake/raw_data | External repo, read-only from this repo's POV | `../datalake/` (sibling repo) | populated for ~9-10 tickers |
-| LLM Source | Gemini Enterprise Agent Platform | `src/agents/llm_client.py` | scaffold (empty) |
+| LLM Source | Llama 3.3 70B Instruct (MaaS) via Gemini Enterprise Agent Platform — see `docs/evaluation.md` §3.3 for why not a Gemini model | `src/agents/llm_client.py` | initial implementation — `generate_structured()` wired to the MaaS REST endpoint; not yet exercised against a live backtest |
 | Embeddings | Vertex AI `textembedding-gecko@003` | `src/retriever/embeddings.py` (not yet created) | not started |
 
 ## 3. Debate protocol (per-request flow)
@@ -124,7 +124,7 @@ agent nodes. Proposed shape (Pydantic pair per CLAUDE.md convention:
   "horizon": "1W",
   "status": "DONE",              // PENDING | RUNNING | DONE | FAILED
   "as_of_date": "2024-03-15",    // point-in-time anchor — see docs/evaluation.md, critical for backtesting
-  "model_version": "gemini-1.5-pro-002",  // exact LLM version used, for reproducibility
+  "model_version": "meta/llama-3.3-70b-instruct-maas",  // exact LLM version used, for reproducibility
   "result": {
     "direction": "BUY",          // BUY | HOLD | SELL — the only three allowed values
     "confidence": 0.72,          // 0.0-1.0, PM's self-reported confidence

@@ -23,6 +23,8 @@ SQLAlchemy models used by the rest of the system.
 | `article_summaries` | `ARTICLE_SUMMARIES/*.json`                           | `symbol, url, title, source, time_published` + sentiment scores      |
 | `macro_series`      | `FRED_MACRO/*.csv`                                   | `series_id, date, value`                                             |
 
+![Database tables](../../docs/mas_db_diagram.png)
+
 ### Why JSONB for `fundamentals`
 
 One row = one report (one quarter for one ticker). The financial statements
