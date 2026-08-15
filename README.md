@@ -66,6 +66,6 @@ python data_scripts/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <
 
 In order to load data into db use: 
 ```bash
-uv run python -n src.db.load
+uv run python -m src.db.load
 ```
 This command will create tables and load data directly from Datalake.
