@@ -25,22 +25,28 @@ real database (see tests/unit/test_agents_nodes.py). This script needs:
     you ingested via data_scripts/alpha_vantage_fetcher.py
 
 Usage:
-    uv run python test_agent_db_integration.py TSLA 2025-06-01
+    uv run python tests/integration/test_agent_db_integration.py TSLA 2025-06-01
 """
 
 import sys
 from datetime import date
+from pathlib import Path
 
-from dotenv import load_dotenv
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  
+
+from dotenv import load_dotenv 
 
 load_dotenv()
 
-from src.agents.nodes import financial_agent_node  # noqa: E402
+from src.agents.nodes import financial_agent_node 
 
 
 def main() -> None:
     if len(sys.argv) != 3:
-        print("Usage: uv run python test_agent_db_integration.py <TICKER> <YYYY-MM-DD>")
+        print(
+            "Usage: uv run python tests/integration/test_agent_db_integration.py "
+            "<TICKER> <YYYY-MM-DD>"
+        )
         sys.exit(1)
 
     ticker, as_of_date_str = sys.argv[1], sys.argv[2]

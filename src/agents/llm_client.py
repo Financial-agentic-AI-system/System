@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import time
 from typing import TypeVar
 
@@ -32,7 +33,7 @@ _PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 _LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
 _API_KEY = os.environ.get("GEMINI_API_KEY")
 
-_MAX_RETRIES = 3
+_MAX_RETRIES = 5
 _TIMEOUT_S = 60
 _SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
@@ -77,15 +78,51 @@ def _auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {_access_token()}"}
 
 
+_RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+
+
+def _should_retry(exc: Exception) -> bool:
+    """A 4xx like 404/401/403 (wrong URL, bad auth, license not accepted)
+    won't fix itself by waiting — retrying just adds delay before the same
+    failure repeats. Only rate limits, transient server errors, and
+    connection-level problems (no response at all) are worth retrying.
+    """
+    response = getattr(exc, "response", None)
+    if response is not None:
+        return response.status_code in _RETRYABLE_STATUS_CODES
+    return True
+
+
+def _retry_delay(exc: Exception, attempt: int) -> float:
+    """429s need longer, jittered backoff than other errors.
+
+    The debate graph fans Financial/Sentiment/Macro out concurrently (see
+    graph.py), so all three can hit the MaaS quota at once — a short fixed
+    backoff has them all retry in lockstep and hit it again together.
+    Respects `Retry-After` if the API sends one; otherwise backs off harder
+    than the default path and adds jitter to break that lockstep.
+    """
+    response = getattr(exc, "response", None)
+    if response is not None and response.status_code == 429:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after is not None:
+            try:
+                return float(retry_after)
+            except ValueError:
+                pass
+        return min(60.0, 5 * 2**attempt) + random.uniform(0, 1)
+    return 2**attempt
+
+
 def generate_structured(prompt: str, schema: type[T]) -> T:
     """Call the LLM with `prompt`, parse the response into `schema`.
 
     No `tools` param is ever sent to the API — see the module docstring and
     docs/evaluation.md §2 for why that matters during backtests.
 
-    Retries up to `_MAX_RETRIES` times (network errors, malformed JSON, or a
-    response that fails Pydantic validation) with exponential backoff before
-    raising `LLMClientError`.
+    Retries up to `_MAX_RETRIES` times, but only for errors worth retrying
+    (see `_should_retry`) — a permanent error like a 404 fails immediately
+    instead of burning through the full backoff schedule first.
     """
     url = _endpoint_url()
     body = {
@@ -121,10 +158,12 @@ def generate_structured(prompt: str, schema: type[T]) -> T:
             ValidationError,
         ) as exc:
             last_error = exc
+            if not _should_retry(exc):
+                break
             if attempt < _MAX_RETRIES:
-                time.sleep(2**attempt)
+                time.sleep(_retry_delay(exc, attempt))
 
     raise LLMClientError(
-        f"generate_structured failed after {_MAX_RETRIES} attempts for schema "
+        f"generate_structured failed after {attempt} attempt(s) for schema "
         f"'{schema.__name__}': {last_error}"
     ) from last_error

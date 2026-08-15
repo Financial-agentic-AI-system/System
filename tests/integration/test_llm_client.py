@@ -13,19 +13,24 @@ Prereqs (one-time):
     # in .env (see .env.example): GCP_PROJECT_ID=<your project>, GCP_LOCATION=<region>
 
 Usage:
-    uv run python test_llm_client.py
+    uv run python tests/integration/test_llm_client.py
 
 Delete this file (or move it into tests/unit as a proper, mocked test) once
 llm_client.py has been exercised against a real backtest run.
 """
 
-from dotenv import load_dotenv
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  
+
+from dotenv import load_dotenv 
 
 load_dotenv()
 
-from pydantic import BaseModel  # noqa: E402
+from pydantic import BaseModel  
 
-from src.agents.llm_client import MODEL_VERSION, generate_structured  # noqa: E402
+from src.agents.llm_client import MODEL_VERSION, generate_structured 
 
 
 class Ping(BaseModel):
