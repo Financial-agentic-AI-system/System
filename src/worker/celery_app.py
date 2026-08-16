@@ -15,7 +15,4 @@ app.conf.update(
     enable_utc=True,
 )
 
-
-@app.task
-def test_task():
-    return "Celery works!"
+from src.worker import tasks  # noqa: E402, F401
