@@ -5,7 +5,12 @@ from celery import Celery
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 
-app = Celery("mas_worker", broker=REDIS_URL, backend=REDIS_URL)
+app = Celery(
+    "mas_worker",
+    broker=REDIS_URL,
+    backend=REDIS_URL,
+    include=["src.worker.tasks"],
+)
 
 app.conf.update(
     task_serializer="json",
@@ -14,5 +19,3 @@ app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
-
-from src.worker import tasks  # noqa: E402, F401
