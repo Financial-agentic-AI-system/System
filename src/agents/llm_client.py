@@ -114,8 +114,12 @@ def _retry_delay(exc: Exception, attempt: int) -> float:
     return 2**attempt
 
 
-def generate_structured(prompt: str, schema: type[T]) -> T:
+def generate_structured(prompt: str, schema: type[T], temperature: float = 0.0) -> T:
     """Call the LLM with `prompt`, parse the response into `schema`.
+
+    `temperature` defaults to 0 for deterministic, reproducible output —
+    see docs/evaluation.md, backtests need results that don't change between
+    runs of the same `as_of_date`/prompt.
 
     No `tools` param is ever sent to the API — see the module docstring and
     docs/evaluation.md §2 for why that matters during backtests.
@@ -128,6 +132,7 @@ def generate_structured(prompt: str, schema: type[T]) -> T:
     body = {
         "model": MODEL_VERSION,
         "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
         "response_format": {
             "type": "json_schema",
             "json_schema": {
