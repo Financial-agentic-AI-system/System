@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from src.agents.state import PredictResult
 from src.cache.redis_client import redis_client
-from src.cache.schemas import DebateStatus, DebateStatusValue, HistoryEntry
+from src.cache.schemas import DebateStatus, DebateStatusValue, HistoryEntry, TaskMeta
 
 CACHE_TTL_SECONDS = 60 * 60 * 24  # 24h — cache, not permanent storage
 
@@ -25,6 +25,21 @@ def _history_key(task_id: str) -> str:
 
 def _result_key(task_id: str) -> str:
     return f"debate:{task_id}:result"
+
+
+def _meta_key(task_id: str) -> str:
+    return f"debate:{task_id}:meta"
+
+
+def set_meta(task_id: str, meta: TaskMeta) -> None:
+    redis_client.set(_meta_key(task_id), meta.model_dump_json(), ex=CACHE_TTL_SECONDS)
+
+
+def get_meta(task_id: str) -> TaskMeta | None:
+    raw = redis_client.get(_meta_key(task_id))
+    if raw is None:
+        return None
+    return TaskMeta.model_validate_json(raw)
 
 
 def set_status(

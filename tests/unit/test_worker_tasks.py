@@ -165,3 +165,23 @@ def test_run_debate_task_wraps_correctly(monkeypatch):
 
     status = debate_cache.get_status(async_result.id)
     assert status.status == "DONE"
+
+
+def test_run_debate_task_accepts_iso_string_date(monkeypatch):
+    """The API sends as_of_date as an ISO string (JSON task serializer)."""
+    seen = {}
+
+    def fake_run(ticker, horizon, as_of_date, task_id):
+        seen["as_of_date"] = as_of_date
+
+        class _R:
+            def model_dump(self, mode):
+                return {}
+
+        return _R()
+
+    monkeypatch.setattr(tasks, "_run_debate", fake_run)
+
+    tasks.run_debate.apply(args=["AAPL", "1W", "2025-12-30"])
+
+    assert seen["as_of_date"] == date(2025, 12, 30)
