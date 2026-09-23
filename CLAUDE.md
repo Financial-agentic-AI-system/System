@@ -35,7 +35,7 @@ debate protocol (round limit, termination condition), and
 | `data_scripts/`      | one-off CLI scripts; fetch raw data from Alpha Vantage into the datalake |
 | `notebooks/`         | experiments, not production code                                        |
 | `src/agents/`        | LangGraph debate: `states.py`, `nodes.py`, `graph.py`, prompts in `prompts/*.yaml` via `prompt_loader.py` |
-| `src/api/v1/`        | FastAPI routes — 3 endpoints, see `endpoints/`                          |
+| `src/api/v1/`        | FastAPI routes — 4 endpoints, see `endpoints/`                          |
 | `src/worker/`        | the ONLY Celery worker in this system — runs the LangGraph debate       |
 | `src/transformer/`   | one-off data transformer — NOT a Celery worker (see rule below)         |
 | `src/retriever/`     | LangChain semantic search + pgvector upsert                             |
