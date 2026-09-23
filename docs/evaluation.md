@@ -70,8 +70,11 @@ WHERE fiscal_date <= :as_of_date   -- or date / time_published, per table
 
 ### 3.2 Network isolation container
 
-A dedicated `backtest-proxy` service (e.g. `tinyproxy` or `squid`), sitting
-between the worker container and the internet:
+Implemented in `docker-compose.yaml` (`backtest` profile) and
+`docker/backtest-proxy/squid.conf`. A dedicated `backtest-proxy` service
+(squid — chosen over tinyproxy: allowlisting HTTPS `CONNECT` tunnels by
+destination domain is squid's standard `acl dstdomain` use case, no SSL
+bump needed) sits between the worker container and the internet:
 
 ```yaml
 backtest-worker:
@@ -80,22 +83,38 @@ backtest-worker:
     - HTTP_PROXY=http://backtest-proxy:8888
     - HTTPS_PROXY=http://backtest-proxy:8888
   networks:
-    - backtest-net       # no default internet route on this network
+    - backtest-net       # ONLY this network — no default internet route
 
 backtest-proxy:
-  image: tinyproxy
+  image: ubuntu/squid:latest
   volumes:
-    - ./docker/backtest-proxy.conf:/etc/tinyproxy/tinyproxy.conf:ro
+    - ./docker/backtest-proxy/squid.conf:/etc/squid/squid.conf:ro
   networks:
     - backtest-net
     - default            # only this service can reach the internet
 ```
 
-Allowlist in `backtest-proxy.conf` should be as narrow as the LLM/embedding
-calls actually require (typically the specific regional Vertex AI endpoint,
-e.g. `us-central1-aiplatform.googleapis.com`, rather than a wildcard on
-`googleapis.com`) — narrower is better since Google hosts many products
-(including Search) behind that domain family.
+Postgres and Redis are also attached to `backtest-net` (in addition to
+`default`) so `backtest-worker` — which has no other network — can still
+reach the DB and cache; neither needs internet access itself, so this
+doesn't weaken the isolation.
+
+Allowlist in `docker/backtest-proxy/squid.conf` is as narrow as the
+LLM/embedding calls actually require — currently
+`us-central1-aiplatform.googleapis.com` (the inference calls themselves)
+and `oauth2.googleapis.com` (ADC token refresh talks to a *different* host
+than the inference endpoint — easy to miss, discovered by allowing all +
+reading squid's `access.log` during one real call, then locking down).
+Narrower than a wildcard on `googleapis.com` is deliberate, since Google
+hosts many products (including Search) behind that domain family.
+
+Verification: from `backtest-worker`, a direct `curl` to any non-Google
+host must fail with no route (proves the network has no default gateway);
+a `curl -x http://backtest-proxy:8888` to an allowlisted host must
+succeed; the same through the proxy to a non-allowlisted host must get a
+squid 403 (proves the allowlist itself is enforced, not just "a proxy
+exists"). Run via `docker compose --profile backtest run --rm
+backtest-worker ...`.
 
 ### 3.3 Backtest window and model cutoff
 

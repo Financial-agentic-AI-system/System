@@ -14,6 +14,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - default
+      - backtest-net
 
   redis:
     image: redis:7-alpine
@@ -24,6 +27,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - default
+      - backtest-net
 
   backend:
     build:
@@ -68,5 +74,39 @@ services:
     depends_on:
       - backend
 
+  # --- Backtest-only services (docs/evaluation.md §2-3.2) ---------------- #
+  # Not started by a plain `docker compose up`. Run with:
+  #   docker compose --profile backtest up backtest-worker backtest-proxy
+  backtest-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    profiles: ["backtest"]
+    volumes:
+      - ../datalake:/datalake:ro
+      - ./.env:/app/.env
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/mas_db
+      - REDIS_URL=redis://redis:6379/0
+      - HTTP_PROXY=http://backtest-proxy:8888
+      - HTTPS_PROXY=http://backtest-proxy:8888
+    networks:
+      - backtest-net
+    depends_on:
+      - backtest-proxy
+
+  backtest-proxy:
+    image: ubuntu/squid:latest
+    profiles: ["backtest"]
+    volumes:
+      - ./docker/backtest-proxy/squid.conf:/etc/squid/squid.conf:ro
+    networks:
+      - backtest-net   # reachable by backtest-worker
+      - default        # the only backtest-* container with internet
+
 volumes:
   postgres_data:
+
+networks:
+  backtest-net:
+    internal: true
