@@ -1,9 +1,10 @@
 """Unit tests for src/agents/nodes.py.
 
 Convention (matches tests/unit/test_db_loaders.py): no real database and no
-real LLM calls here. `fetch_*` (thin SQL) is verified manually against a
-running Postgres, not here. `render_prompt` and `llm_client.generate_structured`
-are monkeypatched so these tests only check each node's own logic: which
+real LLM calls here. `fetch_*` now lives in `src/db/queries.py` and is
+verified manually against a running Postgres, not here. `render_prompt` and
+`llm_client.generate_structured` are monkeypatched so these tests only check
+each node's own logic: which
 prompt key it picks, what it passes, and which state key it returns.
 """
 
