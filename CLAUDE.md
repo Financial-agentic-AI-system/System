@@ -114,3 +114,7 @@ uv run ruff format .
 - When unsure between two implementation approaches for agent/graph/worker
   code, explain both and ask — don't silently pick one.
 - If function is critical write unit tests.
+- `README.md` is setup and usage only. Decisions and their reasoning go to
+  `docs/project_decisions.md` as a dated entry (`docs/adr/` for longer-form
+  records); implementation detail goes in the docstring next to the code.
+  Never write the reasoning from a cha and implementation details from a chat into the readme/documentation.

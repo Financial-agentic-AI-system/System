@@ -90,11 +90,16 @@ def fetch_macro_series(
 def fetch_recent_articles(
     session: Session, ticker: str, as_of_date: date, limit: int = 10
 ) -> list[ArticleSummary]:
+    """The `limit` most recent articles published on or before `as_of_date`.
+
+    `time_published` is a timestamp, so `<= as_of_date` would coerce the bound
+    to midnight and drop everything published on `as_of_date` itself.
+    """
     stmt = (
         select(ArticleSummary)
         .where(
             ArticleSummary.symbol == ticker,
-            ArticleSummary.time_published <= as_of_date,
+            ArticleSummary.time_published < as_of_date + timedelta(days=1),
         )
         .order_by(ArticleSummary.time_published.desc())
         .limit(limit)
