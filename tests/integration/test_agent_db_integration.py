@@ -4,7 +4,7 @@ a real LLM call, end to end?
 Exercises the actual production path used by the debate graph, no mocks:
 
     Postgres (fundamentals / stock_prices tables)
-      -> fetch_fundamentals / fetch_prices        (src/agents/nodes.py)
+      -> fetch_fundamentals / fetch_prices        (src/db/queries.py)
       -> format_fundamentals_context / format_price_context
       -> render_prompt("financial_agent", ...)    (src/agents/prompt_loader.py)
       -> llm_client.generate_structured(...)      (src/agents/llm_client.py)
@@ -32,13 +32,13 @@ import sys
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.agents.nodes import financial_agent_node 
+from src.agents.nodes import financial_agent_node
 
 
 def main() -> None:
