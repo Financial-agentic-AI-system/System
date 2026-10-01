@@ -1,6 +1,7 @@
 """Reusable Streamlit building blocks shared by the pages."""
 
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import config
 import streamlit as st
@@ -94,8 +95,28 @@ def render_rounds(rounds: list[RoundView], live: bool) -> None:
         st.markdown("".join(parts), unsafe_allow_html=True)
 
 
+def user_tz() -> tzinfo:
+    """The viewer's time zone, as reported by their browser.
+
+    `datetime.astimezone()` / `datetime.now()` would use the *server's* zone,
+    which is UTC inside the `frontend` container. Falls back to `config.
+    TIMEZONE` ($TZ), then UTC.
+    """
+    for name in (st.context.timezone, config.TIMEZONE):
+        if name:
+            try:
+                return ZoneInfo(name)
+            except (ZoneInfoNotFoundError, ValueError):
+                continue
+    return timezone.utc
+
+
 def _fmt_time(ts: datetime | None) -> str:
-    return ts.astimezone().strftime("%H:%M:%S") if ts else ""
+    if ts is None:
+        return ""
+    if ts.tzinfo is None:  # the backend always sends UTC
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(user_tz()).strftime("%H:%M:%S")
 
 
 def render_transcript(history: list[HistoryEntry]) -> None:
@@ -154,7 +175,7 @@ def remember_run(task_id: str, ticker: str, horizon: str, as_of: str) -> None:
             "ticker": ticker,
             "horizon": horizon,
             "as_of_date": as_of,
-            "started_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "started_at": datetime.now(user_tz()).strftime("%Y-%m-%d %H:%M:%S"),
         },
     )
 
