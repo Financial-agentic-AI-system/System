@@ -24,7 +24,7 @@ if not task_id:
     )
     st.stop()
 
-client = get_client(st.session_state.mock_mode)
+client = get_client()
 try:
     resp = client.result(task_id)
     try:

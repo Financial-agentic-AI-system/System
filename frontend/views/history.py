@@ -11,7 +11,7 @@ st.caption(
     "so this lists the debates opened in this session."
 )
 
-client = get_client(st.session_state.mock_mode)
+client = get_client()
 
 runs = st.session_state.runs
 if not runs:

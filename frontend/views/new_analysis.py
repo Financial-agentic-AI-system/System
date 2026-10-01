@@ -54,7 +54,7 @@ with st.expander("How the debate works"):
     )
 
 if submitted:
-    client = get_client(st.session_state.mock_mode)
+    client = get_client()
     try:
         task_id = client.start(ticker, horizon, as_of)
     except ApiError as exc:

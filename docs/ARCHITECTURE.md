@@ -62,7 +62,7 @@ which 3 or how the aggregation dedupes/ranks across them.
 
 | Component | Responsibility | Code | Status |
 | --- | --- | --- | --- |
-| Frontend | Streamlit UI, talks to backend over REST; built-in mock backend (sidebar toggle) for UI work without the API | `frontend/` | MVP — new analysis, live debate, result, history |
+| Frontend | Streamlit UI, talks to backend over REST (`frontend/api_client.py`) | `frontend/` | MVP — new analysis, live debate, result, history |
 | Backend Server | FastAPI, 4 REST endpoints (§4) + `/health` | `src/api/v1/` | **done, tested** (`tests/unit/test_api_v1.py`) |
 | Message Broker & Agent Cache | Redis — Celery broker/backend + live debate status/history. Cache only, not persisted — a restarted Redis loses in-progress and past debate transcripts; only the final prediction (Postgres, if/when added) would survive that | `src/cache/` | not started |
 | Celery Worker | Runs the LangGraph debate, the only Celery worker in the system | `src/worker/` | scaffold (`test_task` only) |

@@ -1,7 +1,7 @@
 """REST client for the FastAPI backend (docs/ARCHITECTURE.md §4).
 
-`BackendClient` and `mock_backend.MockClient` expose the same four methods,
-so pages never care which one they talk to — see `get_client()`.
+Pages get the client through `get_client()` and only ever see `ApiError`
+(with a message fit to show to the user) when something goes wrong.
 """
 
 from datetime import date
@@ -19,9 +19,50 @@ from models import (
 from pydantic import ValidationError
 
 
+def _detail(resp: requests.Response) -> str:
+    """FastAPI's `detail`: a string (HTTPException) or a list of validation
+    errors (422). Falls back to the raw body.
+    """
+    try:
+        detail = resp.json()["detail"]
+    except (ValueError, KeyError, TypeError):
+        return resp.text.strip()
+    if isinstance(detail, list):
+        parts = []
+        for err in detail:
+            if not isinstance(err, dict):
+                parts.append(str(err))
+                continue
+            field = ".".join(str(p) for p in err.get("loc", []) if p != "body")
+            msg = str(err.get("msg", "invalid value"))
+            parts.append(f"{field}: {msg}" if field else msg)
+        return "; ".join(parts)
+    return str(detail)
+
+
+def _error_message(resp: requests.Response, url: str) -> str:
+    detail = _detail(resp)
+    if resp.status_code == 404:
+        return detail or "Unknown task_id (results expire from Redis after 24 h)."
+    if resp.status_code == 422:
+        return f"The backend rejected the request: {detail}"
+    if resp.status_code == 503:
+        return f"The backend cannot reach Redis / the task queue: {detail}"
+    return f"Backend returned {resp.status_code} for {url}: {detail}"
+
+
 class BackendClient:
     def __init__(self, base_url: str = config.API_URL) -> None:
+        self._root = base_url
         self._base = f"{base_url}{config.API_PREFIX}"
+
+    def health(self) -> bool:
+        """True when the API process answers `GET /health`."""
+        try:
+            resp = requests.get(f"{self._root}/health", timeout=config.HEALTH_TIMEOUT_S)
+        except requests.RequestException:
+            return False
+        return resp.ok
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self._base}{path}"
@@ -31,12 +72,8 @@ class BackendClient:
             )
         except requests.RequestException as exc:
             raise ApiError(f"Cannot reach the backend at {url}: {exc}") from exc
-        if resp.status_code == 404:
-            raise ApiError("Unknown task_id (results expire from Redis after 24 h).")
         if not resp.ok:
-            raise ApiError(
-                f"Backend returned {resp.status_code} for {url}: {resp.text}"
-            )
+            raise ApiError(_error_message(resp, url))
         try:
             return resp.json()
         except ValueError as exc:
@@ -84,10 +121,5 @@ class BackendClient:
         return self._parse(PredictResponse, payload)
 
 
-def get_client(mock: bool):
-    """Return the mock engine or the real REST client."""
-    if mock:
-        from mock_backend import get_mock_client
-
-        return get_mock_client()
+def get_client() -> BackendClient:
     return BackendClient()

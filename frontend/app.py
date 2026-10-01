@@ -1,12 +1,12 @@
 """Streamlit entrypoint: page routing + sidebar.
 
 Run from the repo root:  streamlit run frontend/app.py
-Talks to the FastAPI backend at $API_URL, or to the built-in mock backend
-(sidebar toggle) when the API is not up yet.
+Talks to the FastAPI backend at $API_URL (default http://localhost:8000).
 """
 
 import config
 import streamlit as st
+from api_client import get_client
 from components import inject_css
 
 st.set_page_config(
@@ -15,17 +15,9 @@ st.set_page_config(
     layout="wide",
 )
 
-st.session_state.setdefault("mock_mode", config.default_mock())
 st.session_state.setdefault("runs", [])  # tasks started/opened in this session
 st.session_state.setdefault("task_id", None)
 st.session_state.setdefault("finished", set())  # task_ids seen in a terminal state
-
-
-def _on_mode_change() -> None:
-    # task ids of one backend mean nothing to the other
-    st.session_state.task_id = None
-    st.session_state.runs = []
-    st.session_state.finished = set()
 
 
 pages = [
@@ -42,16 +34,15 @@ pages = [
 nav = st.navigation(pages)
 
 with st.sidebar:
-    st.toggle(
-        "Mock backend",
-        key="mock_mode",
-        on_change=_on_mode_change,
-        help="Simulated debates generated inside the frontend — no API needed.",
-    )
-    if st.session_state.mock_mode:
-        st.caption("Simulated debates, no backend needed.")
+    st.caption(f"API: {config.API_URL}")
+    if get_client().health():
+        st.caption(":green[●] Backend online")
     else:
-        st.caption(f"API: {config.API_URL}")
+        st.error(
+            "Backend is not reachable. Start the stack with "
+            "`docker compose up --build`.",
+            icon=":material/cloud_off:",
+        )
 
 inject_css()
 nav.run()
