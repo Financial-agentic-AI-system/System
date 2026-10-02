@@ -24,8 +24,9 @@ debate protocol (round limit, termination condition), and
   task queue), SQLAlchemy + Postgres/pgvector (vector store),
   LangChain (retriever), Streamlit (frontend).
 - LLM: Gemini Enterprise Agent Platform, via `src/agents/llm_client.py`.
-- Embeddings: Vertex AI `textembedding-gecko@003`, via
-  `src/retriever/embeddings.py`.
+- Embeddings: Vertex AI `text-embedding-005` (768 dims), via
+  `src/retriever/embeddings.py`; stored in two `vector` columns of
+  `article_summaries`, filled by `python -m src.db.load`.
 - Linting/formatting: **ruff only**.
 
 ## Repository layout

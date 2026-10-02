@@ -27,3 +27,16 @@ Agents see data up to **and including** `as_of_date`, on all four sources.
 Chosen over an exclusive bound so the sentiment agent gets that day's news,
 which is the most decision-relevant. No lookahead bias either way — nothing
 published after `as_of_date` is visible.
+
+## 2026-10-02 — Embeddings: `text-embedding-005`, two columns on `article_summaries`
+
+- **Model.** English-specialised (the articles are English), 768 dims, and
+  batched requests. `gemini-embedding-001` takes one text per request, so
+  loading the articles would be far slower; it stays available through
+  `EMBEDDING_MODEL`.
+- **Training cutoff is not a lookahead risk here.** The embedding model
+  generates no text, it only ranks stored articles, and retrieval is filtered
+  by `as_of_date`.
+- **Storage.** `summary_embedding` and `title_summary_embedding` are stored
+  side by side so the retriever can compare the two variants. They are
+  filled by `python -m src.db.load`, not by a separate transformer script.
