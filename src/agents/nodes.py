@@ -1,11 +1,6 @@
-"""LangGraph nodes: DB fetch/format helpers, agent nodes, PM/Critic nodes,
-and the final-result assembly node.
+"""LangGraph nodes: row formatters, agent nodes, PM/Critic nodes, and the
+final-result assembly node. The SQL they read lives in `src/db/queries.py`.
 """
-
-from datetime import date, timedelta
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from src.agents import llm_client
 from src.agents.prompt_loader import render_prompt
@@ -19,87 +14,13 @@ from src.agents.state import (
     PredictResult,
 )
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
+from src.db.queries import (
+    fetch_fundamentals,
+    fetch_macro_series,
+    fetch_prices,
+    fetch_recent_articles,
+)
 from src.db.session import get_session
-
-
-def fetch_fundamentals(
-    session: Session, ticker: str, as_of_date: date, quarters: int = 40
-) -> list[Fundamentals]:
-    """Rows for the last `quarters` distinct fiscal dates <= as_of_date.
-
-    Selects by distinct fiscal_date first, then fetches every report_type
-    for those dates — a plain row-limit would cut a quarter's 3 report
-    types (BALANCE_SHEET/CASH_FLOW/INCOME_STATEMENT) unevenly, returning an
-    incomplete last quarter.
-    """
-    date_stmt = (
-        select(Fundamentals.fiscal_date)
-        .where(Fundamentals.symbol == ticker, Fundamentals.fiscal_date <= as_of_date)
-        .distinct()
-        .order_by(Fundamentals.fiscal_date.desc())
-        .limit(quarters)
-    )
-    dates = session.scalars(date_stmt).all()
-    if not dates:
-        return []
-
-    stmt = (
-        select(Fundamentals)
-        .where(Fundamentals.symbol == ticker, Fundamentals.fiscal_date.in_(dates))
-        .order_by(Fundamentals.fiscal_date.desc(), Fundamentals.report_type)
-    )
-    return list(session.scalars(stmt))
-
-
-def fetch_prices(
-    session: Session, ticker: str, as_of_date: date, lookback_days: int = 3600
-) -> list[StockPrice]:
-    start = as_of_date - timedelta(days=lookback_days)
-    stmt = (
-        select(StockPrice)
-        .where(
-            StockPrice.symbol == ticker,
-            StockPrice.date <= as_of_date,
-            StockPrice.date >= start,
-        )
-        .order_by(StockPrice.date.desc())
-    )
-    return list(session.scalars(stmt))
-
-
-def fetch_macro_series(
-    session: Session, as_of_date: date, lookback_days: int = 3600
-) -> list[MacroSeries]:
-    """Rows for every series within the lookback window, <= as_of_date.
-
-    The window is deliberately long (3600 days, ~10 years) so
-    `format_macro_context` can show a long-run trend (latest vs. earliest
-    value in the window) per series, not just a single snapshot. The
-    trend computation itself happens there, not in SQL, so it stays
-    unit-testable without a database.
-    """
-    start = as_of_date - timedelta(days=lookback_days)
-    stmt = (
-        select(MacroSeries)
-        .where(MacroSeries.date <= as_of_date, MacroSeries.date >= start)
-        .order_by(MacroSeries.series_id, MacroSeries.date.desc())
-    )
-    return list(session.scalars(stmt))
-
-
-def fetch_recent_articles(
-    session: Session, ticker: str, as_of_date: date, limit: int = 10
-) -> list[ArticleSummary]:
-    stmt = (
-        select(ArticleSummary)
-        .where(
-            ArticleSummary.symbol == ticker,
-            ArticleSummary.time_published <= as_of_date,
-        )
-        .order_by(ArticleSummary.time_published.desc())
-        .limit(limit)
-    )
-    return list(session.scalars(stmt))
 
 
 # --------------------------------------------------------------------------- #
