@@ -20,12 +20,11 @@ import requests
 from src.agents.llm_client import _retry_delay, _should_retry
 
 DEFAULT_MODEL = "text-embedding-005"
-# Size of the `vector` columns in src/db/models.py.
 EMBEDDING_DIM = 768
 
 TaskType = Literal["RETRIEVAL_DOCUMENT", "RETRIEVAL_QUERY"]
 
-_DEFAULT_BATCH_SIZE = 50  # API limit is 250 texts / 20k tokens per request
+_DEFAULT_BATCH_SIZE = 50  
 _MAX_RETRIES = 5
 _TIMEOUT_S = 60
 _SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
