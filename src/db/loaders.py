@@ -12,9 +12,11 @@ import datetime as dt
 import json
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
+from sqlalchemy import case
+from sqlalchemy.dialects.postgresql import Insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -231,21 +233,27 @@ def _upsert(
     rows: list[dict],
     conflict_cols: list[str],
     batch_size: int = 500,
+    stale_on_change: Callable[[Insert], dict[str, object]] | None = None,
 ) -> int:
-    """Insert rows with ON CONFLICT DO UPDATE (upsert). Returns row count."""
+    """Insert rows with ON CONFLICT DO UPDATE (upsert). Returns row count.
+
+    `stale_on_change` adds extra SET clauses built from the insert statement.
+    """
     if not rows:
         return 0
     table = model.__table__
-    update_cols = [
-        c.name for c in table.columns if c.name not in conflict_cols and c.name != "id"
-    ]
+    # Only columns the rows carry, so the embedding columns survive a re-load.
+    update_cols = [name for name in rows[0] if name not in conflict_cols]
     total = 0
     for start in range(0, len(rows), batch_size):
         batch = rows[start : start + batch_size]
         stmt = pg_insert(table).values(batch)
         stmt = stmt.on_conflict_do_update(
             index_elements=conflict_cols,
-            set_={col: stmt.excluded[col] for col in update_cols},
+            set_={
+                **{col: stmt.excluded[col] for col in update_cols},
+                **(stale_on_change(stmt) if stale_on_change else {}),
+            },
         )
         session.execute(stmt)
         total += len(batch)
@@ -268,9 +276,31 @@ def load_stock_prices(session: Session, raw_data: Path) -> int:
     return _upsert(session, StockPrice, rows, ["symbol", "date"])
 
 
+def _reset_stale_embeddings(stmt: Insert) -> dict[str, object]:
+    """Reset an embedding to NULL when its source text changed."""
+    table = ArticleSummary.__table__.c
+    summary_changed = stmt.excluded.summary.is_distinct_from(table.summary)
+    title_changed = stmt.excluded.title.is_distinct_from(table.title)
+    return {
+        "summary_embedding": case(
+            (summary_changed, None), else_=table.summary_embedding
+        ),
+        "title_summary_embedding": case(
+            (summary_changed | title_changed, None),
+            else_=table.title_summary_embedding,
+        ),
+    }
+
+
 def load_article_summaries(session: Session, raw_data: Path) -> int:
     rows = list(iter_article_summaries(raw_data))
-    return _upsert(session, ArticleSummary, rows, ["symbol", "url"])
+    return _upsert(
+        session,
+        ArticleSummary,
+        rows,
+        ["symbol", "url"],
+        stale_on_change=_reset_stale_embeddings,
+    )
 
 
 def load_macro_series(session: Session, raw_data: Path) -> int:

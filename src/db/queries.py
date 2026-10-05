@@ -8,10 +8,12 @@ see `docs/project_decisions.md` for the inclusive-cutoff convention and
 Callers pass an explicit `Session`; nothing here opens or commits one.
 """
 
+from collections.abc import Sequence
 from datetime import date, timedelta
+from typing import Literal
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
 
@@ -96,6 +98,46 @@ def fetch_recent_articles(
             ArticleSummary.time_published < as_of_date + timedelta(days=1),
         )
         .order_by(ArticleSummary.time_published.desc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt))
+
+
+EmbeddingVariant = Literal["summary", "title_summary"]
+
+
+def fetch_similar_articles(
+    session: Session,
+    ticker: str,
+    as_of_date: date,
+    query_embedding: Sequence[float],
+    limit: int = 10,
+    variant: EmbeddingVariant = "summary",
+) -> list[ArticleSummary]:
+    """The `limit` articles closest (cosine) to `query_embedding`, published
+    on or before `as_of_date`. `variant` picks which embedding column is
+    searched; articles without that embedding are skipped.
+
+    Same day-inclusive bound as `fetch_recent_articles`. The query vector
+    comes from `src.retriever.embeddings.embed_query`.
+    """
+    column = (
+        ArticleSummary.summary_embedding
+        if variant == "summary"
+        else ArticleSummary.title_summary_embedding
+    )
+    stmt = (
+        select(ArticleSummary)
+        .options(
+            defer(ArticleSummary.summary_embedding),
+            defer(ArticleSummary.title_summary_embedding),
+        )
+        .where(
+            ArticleSummary.symbol == ticker,
+            ArticleSummary.time_published < as_of_date + timedelta(days=1),
+            column.is_not(None),
+        )
+        .order_by(column.cosine_distance(list(query_embedding)))
         .limit(limit)
     )
     return list(session.scalars(stmt))

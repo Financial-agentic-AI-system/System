@@ -20,7 +20,7 @@ flowchart TB
 
     datalake -->|reads raw files| transformer[Data transformer<br/>one-off script, manual, dev-only]
     transformer -->|upsert vectors & metadata| pgvector
-    transformer -->|generates embeddings<br/>API call| embed[Vertex AI<br/>textembedding-gecko@003]
+    transformer -->|generates embeddings<br/>API call| embed[Vertex AI<br/>text-embedding-005]
 
     subgraph external[External]
         alphavantage
@@ -67,13 +67,13 @@ which 3 or how the aggregation dedupes/ranks across them.
 | Message Broker & Agent Cache | Redis — Celery broker/backend + live debate status/history. Cache only, not persisted — a restarted Redis loses in-progress and past debate transcripts; only the final prediction (Postgres, if/when added) would survive that | `src/cache/` | not started |
 | Celery Worker | Runs the LangGraph debate, the only Celery worker in the system | `src/worker/` | scaffold (`test_task` only) |
 | Agents (graph) | PM, Critic, Financial/Sentiment/Macro agents, debate protocol | `src/agents/` | scaffold (empty) — see `docs/agents.md` for the protocol spec |
-| Retriever | LangChain semantic search over pgvector — Sentiment agent only | `src/retriever/` | scaffold (empty) |
+| Retriever | Semantic search over pgvector — Sentiment agent only. `search_articles()` embeds the query and runs the point-in-time similarity query (`fetch_similar_articles` in `src/db/queries.py`). Plain SQLAlchemy + pgvector, no LangChain | `src/retriever/search.py` | search function done, tested (`tests/unit/test_article_search.py`); **not yet used by the Sentiment agent** |
 | Data transformer | One-off script, manual/dev-only: raw files → embeddings → pgvector upsert | `src/transformer/` | scaffold (empty) |
 | DB (Postgres/pgvector) | Relational storage + vector store; Financial/Macro agents query it directly via SQL | `src/db/` | **done, tested** (`tests/unit/test_db_loaders.py`) |
 | data_fetcher | Fetches market/fundamental/sentiment data from Alpha Vantage into the datalake — manual/dev-only, never triggered by the backend | `data_scripts/` | done (one-off CLI scripts) |
 | datalake/raw_data | External repo, read-only from this repo's POV | `../datalake/` (sibling repo) | populated for ~9-10 tickers |
 | LLM Source | Llama 3.3 70B Instruct (MaaS) via Gemini Enterprise Agent Platform — see `docs/evaluation.md` §3.3 for why not a Gemini model | `src/agents/llm_client.py` | initial implementation — `generate_structured()` wired to the MaaS REST endpoint; not yet exercised against a live backtest |
-| Embeddings | Vertex AI `textembedding-gecko@003` | `src/retriever/embeddings.py` (not yet created) | not started |
+| Embeddings | Vertex AI `text-embedding-005`, 768 dims (`EMBEDDING_MODEL` to change). Article vectors are computed by `python -m src.db.load` right after the articles are upserted and stored in `article_summaries.summary_embedding` / `.title_summary_embedding` | `src/retriever/embeddings.py`, `src/db/article_embeddings.py` | **done, tested** (`tests/unit/test_embeddings.py`, `tests/unit/test_article_embeddings.py`) |
 
 ## 3. Debate protocol (per-request flow)
 

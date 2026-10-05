@@ -8,6 +8,7 @@ The other datasets have a simple, stable shape and get fully typed tables.
 
 import datetime as dt
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Date,
     DateTime,
@@ -20,6 +21,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
+from src.retriever.embeddings import EMBEDDING_DIM
 
 
 class Fundamentals(Base):
@@ -74,6 +76,11 @@ class ArticleSummary(Base):
     ticker_sentiment_score: Mapped[float | None] = mapped_column(Float)
     ticker_sentiment_label: Mapped[str | None] = mapped_column(String(32))
     relevance_score: Mapped[float | None] = mapped_column(Float)
+    # Filled by src/db/article_embeddings.py.
+    summary_embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))
+    title_summary_embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIM)
+    )
 
 
 class MacroSeries(Base):

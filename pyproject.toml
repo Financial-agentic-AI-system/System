@@ -18,6 +18,7 @@ dependencies = [
     "streamlit",
     "pydantic",
     "pydantic-settings",
+    "python-dotenv",  # src/db/load.py reads .env when run outside compose
     "alpha-vantage",
     "yfinance",
     "click",

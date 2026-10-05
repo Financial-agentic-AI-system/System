@@ -20,7 +20,7 @@ SQLAlchemy models used by the rest of the system.
 | ------------------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
 | `fundamentals`      | `BALANCE_SHEET/`, `CASH_FLOW/`, `INCOME_STATEMENT/`  | Hybrid: `symbol, report_type, period, fiscal_date` + full report in a `JSONB` `data` column. |
 | `stock_prices`      | `stock_price/*_daily.json`                           | `symbol, date, close`                                                |
-| `article_summaries` | `ARTICLE_SUMMARIES/*.json`                           | `symbol, url, title, source, time_published` + sentiment scores      |
+| `article_summaries` | `ARTICLE_SUMMARIES/*.json`                           | `symbol, url, title, source, time_published` + sentiment scores + two `vector(768)` embeddings |
 | `macro_series`      | `FRED_MACRO/*.csv`                                   | `series_id, date, value`                                             |
 
 ![Database tables](../../docs/mas_db_diagram.png)
@@ -84,3 +84,29 @@ them updates existing rows instead of creating duplicates. The datalake is
 treated as read-only. The `deprecated/` directory is skipped.
 
 See the repository `README.md` for the step-by-step run instructions.
+
+### Article embeddings
+
+After the articles are upserted, `load.py` vectorizes the ones that have no
+embedding yet (`article_embeddings.py`, model in `src/retriever/embeddings.py`)
+into two columns:
+
+| Column                    | Text that was embedded        |
+| ------------------------- | ----------------------------- |
+| `summary_embedding`       | `summary`                     |
+| `title_summary_embedding` | `title` + blank line + `summary` |
+
+- Needs `GCP_PROJECT_ID` and Application Default Credentials
+  (`gcloud auth application-default login`). Without `GCP_PROJECT_ID` the step
+  is skipped; `--no-embed` skips it explicitly.
+- Re-running is cheap: only rows with a `NULL` embedding are sent, and a
+  re-load keeps existing vectors unless the article's title/summary changed.
+- An existing database gets the columns (and the `vector` extension) from
+  `init_db`, which the load runs first.
+
+```sql
+SELECT count(*) AS articles,
+       count(summary_embedding) AS summary_vectors,
+       count(title_summary_embedding) AS title_summary_vectors
+FROM article_summaries;
+```
