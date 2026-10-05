@@ -20,3 +20,10 @@ Chosen over any Gemini model for two reasons:
 
 Both served through the same platform (Gemini Enterprise Agent Platform /
 Vertex AI), same auth, same project — see `src/agents/llm_client.py`.
+
+## 2026-09-27 — `as_of_date` is an inclusive cutoff
+
+Agents see data up to **and including** `as_of_date`, on all four sources.
+Chosen over an exclusive bound so the sentiment agent gets that day's news,
+which is the most decision-relevant. No lookahead bias either way — nothing
+published after `as_of_date` is visible.

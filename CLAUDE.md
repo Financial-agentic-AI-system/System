@@ -34,12 +34,12 @@ debate protocol (round limit, termination condition), and
 | -------------------- | ----------------------------------------------------------------------- |
 | `data_scripts/`      | one-off CLI scripts; fetch raw data from Alpha Vantage into the datalake |
 | `notebooks/`         | experiments, not production code                                        |
-| `src/agents/`        | LangGraph debate: `states.py`, `nodes.py`, `graph.py`, prompts in `prompts/*.yaml` via `prompt_loader.py` |
+| `src/agents/`        | LangGraph debate: `states.py`, `nodes.py`, `graph.py`, prompts in `prompts/*.yaml` via `prompt_loader.py`. No SQL here — read queries live in `src/db/queries.py` |
 | `src/api/v1/`        | FastAPI routes — 4 endpoints, see `endpoints/`                          |
 | `src/worker/`        | the ONLY Celery worker in this system — runs the LangGraph debate       |
 | `src/transformer/`   | one-off data transformer — NOT a Celery worker (see rule below)         |
 | `src/retriever/`     | LangChain semantic search + pgvector upsert                             |
-| `src/db/`            | SQLAlchemy models, session, Alembic migrations                          |
+| `src/db/`            | SQLAlchemy models, session, Alembic migrations; `loaders.py` writes the datalake in, `queries.py` reads it back out |
 | `src/cache/`         | Redis client for live debate/agent status                               |
 | `frontend/`          | Streamlit app, talks to the backend over REST                          |
 | `docker/`            | one Dockerfile per service (backend, worker, frontend)                  |
@@ -114,3 +114,7 @@ uv run ruff format .
 - When unsure between two implementation approaches for agent/graph/worker
   code, explain both and ask — don't silently pick one.
 - If function is critical write unit tests.
+- `README.md` is setup and usage only. Decisions and their reasoning go to
+  `docs/project_decisions.md` as a dated entry (`docs/adr/` for longer-form
+  records); implementation detail goes in the docstring next to the code.
+  Never write the reasoning from a cha and implementation details from a chat into the readme/documentation.

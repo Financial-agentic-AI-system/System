@@ -64,6 +64,9 @@ exclude = [
 select = ["E", "F", "I"]
 ignore = []
 
+[tool.ruff.lint.per-file-ignores]
+"tests/integration/*" = ["E402"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
