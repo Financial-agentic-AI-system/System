@@ -19,9 +19,7 @@ from src.agents.nodes import (
     pm_synthesize_node,
     sentiment_agent_node,
 )
-from src.agents.state import DebateState
-
-MAX_ROUNDS = 3
+from src.agents.state import MAX_ROUNDS, DebateState
 
 
 def route_after_critic(state: DebateState) -> str:

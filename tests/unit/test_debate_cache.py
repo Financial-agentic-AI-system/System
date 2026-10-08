@@ -119,3 +119,25 @@ def test_set_result_then_get_result_roundtrip():
 
 def test_get_result_returns_none_when_missing():
     assert debate_cache.get_result("nope") is None
+
+
+def test_set_meta_then_get_meta_roundtrip():
+    from datetime import date, datetime, timezone
+
+    from src.cache.schemas import TaskMeta
+
+    meta = TaskMeta(
+        ticker="AAPL",
+        horizon="1W",
+        as_of_date=date(2025, 12, 30),
+        model_version="m",
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    debate_cache.set_meta("t1", meta)
+    assert debate_cache.get_meta("t1") == meta
+    ttl = debate_cache.redis_client.ttl(debate_cache._meta_key("t1"))
+    assert 0 < ttl <= debate_cache.CACHE_TTL_SECONDS
+
+
+def test_get_meta_returns_none_when_missing():
+    assert debate_cache.get_meta("nope") is None

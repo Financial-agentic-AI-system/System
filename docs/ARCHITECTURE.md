@@ -62,8 +62,8 @@ which 3 or how the aggregation dedupes/ranks across them.
 
 | Component | Responsibility | Code | Status |
 | --- | --- | --- | --- |
-| Frontend | Streamlit UI, talks to backend over REST | `frontend/app.py` | scaffold (empty) |
-| Backend Server | FastAPI, 3 REST endpoints (§4) | `src/api/v1/` | scaffold (empty) |
+| Frontend | Streamlit UI, talks to backend over REST (`frontend/api_client.py`) | `frontend/` | MVP — new analysis, live debate, result, history |
+| Backend Server | FastAPI, 4 REST endpoints (§4) + `/health` | `src/api/v1/` | **done, tested** (`tests/unit/test_api_v1.py`) |
 | Message Broker & Agent Cache | Redis — Celery broker/backend + live debate status/history. Cache only, not persisted — a restarted Redis loses in-progress and past debate transcripts; only the final prediction (Postgres, if/when added) would survive that | `src/cache/` | not started |
 | Celery Worker | Runs the LangGraph debate, the only Celery worker in the system | `src/worker/` | scaffold (`test_task` only) |
 | Agents (graph) | PM, Critic, Financial/Sentiment/Macro agents, debate protocol | `src/agents/` | scaffold (empty) — see `docs/agents.md` for the protocol spec |
@@ -102,10 +102,12 @@ flowchart TD
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/v1/predict/start` | Enqueue a debate. Body: `{"ticker": "TSLA", "horizon": "1W"}` → returns `task_id` |
+| `POST` | `/api/v1/predict/start` | Enqueue a debate. Body: `{"ticker": "TSLA", "horizon": "1W", "as_of_date": "2026-01-15"}` (`horizon` ∈ `1W`/`1M`/`3M`; `as_of_date` is required — the worker needs the point-in-time anchor, and it cannot be in the future) → `202` with `task_id`. `422` on an invalid body or a ticker that is not in the database, `503` if Redis/the broker/the database is down |
 | `GET` | `/api/v1/predict/result/{task_id}` | Poll/fetch the final prediction (§5) |
-| `GET` | `/api/v1/debate_status/{task_id}` | Live status of an in-progress debate (round number, which agents are active) |
+| `GET` | `/api/v1/debate_status/{task_id}` | Live status of an in-progress debate (round number, which agents are active, `max_rounds`) |
 | `GET` | `/api/v1/history/{task_id}` | Full transcript of the debate so far (or of a just-finished one) |
+| `GET` | `/api/v1/meta` | Settings for the frontend form: `horizons`, `backtest_start`, `backtest_end`, `max_rounds` |
+| `GET` | `/api/v1/tickers` | Tickers with data in the database → `{"tickers": ["AAPL", ...]}`. `503` if the database is down |
 
 Data ingestion has no endpoint by design (see note in §1) — a developer runs
 `data_scripts/*` and the transformer manually.
