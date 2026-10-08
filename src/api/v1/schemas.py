@@ -7,7 +7,7 @@ there is nothing to translate.
 """
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -15,6 +15,11 @@ from src.agents.state import PredictResult
 from src.cache.schemas import DebateStatus, DebateStatusValue, HistoryEntry
 
 Horizon = Literal["1W", "1M", "3M"]
+HORIZONS: list[str] = list(get_args(Horizon))
+
+# Backtest window, docs/evaluation.md §3.3.
+BACKTEST_START = date(2025, 1, 1)
+BACKTEST_END = date(2026, 6, 30)
 
 
 class PredictStartRequest(BaseModel):
@@ -64,7 +69,18 @@ class PredictResultResponse(BaseModel):
 
 
 class DebateStatusResponse(DebateStatus):
-    """Same fields as the cached `DebateStatus`."""
+    """The cached `DebateStatus` plus the round limit."""
+
+    max_rounds: int
+
+
+class MetaResponse(BaseModel):
+    """Settings the frontend needs to build its forms."""
+
+    horizons: list[str]
+    backtest_start: date
+    backtest_end: date
+    max_rounds: int
 
 
 class TickersResponse(BaseModel):

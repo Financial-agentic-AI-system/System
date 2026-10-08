@@ -5,8 +5,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import config
 import streamlit as st
+from api_client import get_client
 from debate_model import AGENT_LABELS, AGENTS, RoundView, stage_states
-from models import ApiError, HistoryEntry
+from models import ApiError, HistoryEntry, Meta
 
 CSS = """
 <style>
@@ -199,10 +200,22 @@ def open_task(client, task_id: str) -> None:
     st.switch_page("views/result.py" if finished else "views/live_debate.py")
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def load_meta() -> Meta:
+    """`GET /meta`, cached. Raises `ApiError` when the backend is down."""
+    return get_client().meta()
+
+
 def page_footer() -> None:
-    st.caption(
-        "Academic research prototype (engineering thesis). "
-        "Not financial advice. Horizons and data are limited to the "
-        f"{config.BACKTEST_START:%Y-%m-%d} – {config.BACKTEST_END:%Y-%m-%d} "
-        "backtest window."
-    )
+    text = "Academic research prototype (engineering thesis). Not financial advice."
+    try:
+        meta = load_meta()
+    except ApiError:
+        pass
+    else:
+        text += (
+            " Data is limited to the "
+            f"{meta.backtest_start:%Y-%m-%d} – {meta.backtest_end:%Y-%m-%d} "
+            "backtest window."
+        )
+    st.caption(text)

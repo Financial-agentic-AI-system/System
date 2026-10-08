@@ -347,3 +347,29 @@ def test_fetch_tickers_query():
     assert fetch_tickers(session) == ["AAPL"]
     assert "SELECT DISTINCT stock_prices.symbol" in session.sql
     assert "ORDER BY stock_prices.symbol" in session.sql
+
+
+# --------------------------------------------------------------------------- #
+# GET /meta and max_rounds in /debate_status
+# --------------------------------------------------------------------------- #
+def test_meta_exposes_backend_settings(client):
+    from src.agents.state import MAX_ROUNDS
+
+    resp = client.get("/api/v1/meta")
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "horizons": ["1W", "1M", "3M"],
+        "backtest_start": "2025-01-01",
+        "backtest_end": "2026-06-30",
+        "max_rounds": MAX_ROUNDS,
+    }
+
+
+def test_debate_status_carries_round_limit(client):
+    from src.agents.graph import MAX_ROUNDS as GRAPH_LIMIT
+
+    _seed()
+    debate_cache.set_status("t1", "RUNNING", round_number=2)
+
+    assert client.get("/api/v1/debate_status/t1").json()["max_rounds"] == GRAPH_LIMIT

@@ -36,7 +36,7 @@ def _critic(agree: bool) -> dict:
 
 
 def _running() -> DebateStatus:
-    return DebateStatus(status="RUNNING", round_number=1)
+    return DebateStatus(status="RUNNING", round_number=1, max_rounds=3)
 
 
 def test_build_rounds_empty():
@@ -138,3 +138,15 @@ def test_describe_progress_terminal_states():
     failed = DebateStatus(status="FAILED", round_number=2, error="LLM timeout")
     assert "LLM timeout" in describe_progress([], failed)
     assert describe_progress([], DebateStatus(status="DONE")) == "Debate finished."
+
+
+def test_describe_progress_uses_round_limit_from_status():
+    full = [
+        _entry(a, 1, {f"{a}_report": _report()})
+        for a in ("financial", "sentiment", "macro")
+    ]
+    rounds = build_rounds(
+        full + [_entry("pm_synthesize", 1, _pm()), _entry("critic", 1, _critic(False))]
+    )
+    last_round = DebateStatus(status="RUNNING", round_number=1, max_rounds=1)
+    assert "final prediction" in describe_progress(rounds, last_round)

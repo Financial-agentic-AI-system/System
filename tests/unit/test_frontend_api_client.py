@@ -191,3 +191,23 @@ def test_tickers(http):
 
     assert _client().tickers() == ["AAPL", "TSLA"]
     assert calls[0][:2] == ("GET", "http://api:8000/api/v1/tickers")
+
+
+def test_meta(http):
+    queue, calls = http
+    queue.append(
+        FakeResponse(
+            payload={
+                "horizons": ["1W", "1M"],
+                "backtest_start": "2025-01-01",
+                "backtest_end": "2026-06-30",
+                "max_rounds": 3,
+            }
+        )
+    )
+
+    meta = _client().meta()
+
+    assert calls[0][:2] == ("GET", "http://api:8000/api/v1/meta")
+    assert meta.horizons == ["1W", "1M"] and meta.max_rounds == 3
+    assert meta.backtest_end == date(2026, 6, 30)

@@ -47,11 +47,12 @@ def _render_state() -> bool:
         st.error(message)
     elif live:
         st.info(f"{message}", icon=":material/hourglass_top:")
-    st.progress(
-        min(status.round_number, config.MAX_ROUNDS) / config.MAX_ROUNDS,
-        text=f"Round {min(status.round_number, config.MAX_ROUNDS)} of "
-        f"{config.MAX_ROUNDS} (max)",
-    )
+    if status.max_rounds:
+        current = min(status.round_number, status.max_rounds)
+        st.progress(
+            current / status.max_rounds,
+            text=f"Round {current} of {status.max_rounds} (max)",
+        )
     render_rounds(rounds, live)
 
     st.subheader("Transcript")

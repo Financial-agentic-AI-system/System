@@ -6,7 +6,6 @@ a backend on `http://localhost:8000`.
 """
 
 import os
-from datetime import date
 
 API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 API_PREFIX = "/api/v1"
@@ -15,13 +14,7 @@ TIMEZONE = os.getenv("TZ", "")
 REQUEST_TIMEOUT_S = 10
 HEALTH_TIMEOUT_S = 3
 
-# horizon code sent to the backend -> label shown to the user
+# Display labels for the horizon codes from GET /meta.
 HORIZONS = {"1W": "1 week", "1M": "1 month", "3M": "3 months"}
 
-# Backtest window from docs/evaluation.md §3.3 — the model's training cutoff
-# (Dec 2023) only guarantees a clean, leak-free run inside this window.
-BACKTEST_START = date(2025, 1, 1)
-BACKTEST_END = date(2026, 6, 30)
-
-MAX_ROUNDS = 3  # mirrors src/agents/graph.py::MAX_ROUNDS
 POLL_SECONDS = 2

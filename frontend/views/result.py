@@ -6,6 +6,7 @@ import streamlit as st
 from api_client import get_client
 from components import (
     direction_badge,
+    load_meta,
     md,
     page_footer,
     render_rounds,
@@ -56,7 +57,11 @@ left.markdown(direction_badge(result.direction, big=True), unsafe_allow_html=Tru
 with right:
     m1, m2, m3 = st.columns(3)
     m1.metric("Confidence", f"{result.confidence:.0%}")
-    m2.metric("Rounds used", f"{result.rounds_used} / 3")
+    try:
+        limit = f" / {load_meta().max_rounds}"
+    except ApiError:
+        limit = ""
+    m2.metric("Rounds used", f"{result.rounds_used}{limit}")
     m3.metric(
         "Critic",
         "Agreed" if result.critic_agreed else "Did not agree",

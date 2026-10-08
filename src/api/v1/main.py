@@ -4,7 +4,7 @@ from kombu.exceptions import OperationalError as BrokerError
 from redis.exceptions import RedisError
 from sqlalchemy.exc import OperationalError as DatabaseError
 
-from src.api.v1.endpoints import debate, predict, tickers
+from src.api.v1.endpoints import debate, meta, predict, tickers
 
 API_PREFIX = "/api/v1"
 
@@ -13,6 +13,7 @@ app = FastAPI(title="Multi-Agent Financial System API", version="0.1.0")
 app.include_router(predict.router, prefix=API_PREFIX)
 app.include_router(debate.router, prefix=API_PREFIX)
 app.include_router(tickers.router, prefix=API_PREFIX)
+app.include_router(meta.router, prefix=API_PREFIX)
 
 
 @app.exception_handler(RedisError)

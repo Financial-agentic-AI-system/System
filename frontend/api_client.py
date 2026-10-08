@@ -13,6 +13,7 @@ from models import (
     ApiError,
     DebateStatus,
     HistoryEntry,
+    Meta,
     PredictResponse,
     PredictResult,
 )
@@ -97,6 +98,9 @@ class BackendClient:
             return str(payload["task_id"])
         except (KeyError, TypeError) as exc:
             raise ApiError("Response of /predict/start has no task_id") from exc
+
+    def meta(self) -> Meta:
+        return self._parse(Meta, self._request("GET", "/meta"))
 
     def tickers(self) -> list[str]:
         payload = self._request("GET", "/tickers")

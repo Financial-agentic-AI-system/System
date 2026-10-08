@@ -54,9 +54,19 @@ class PredictResult(BaseModel):
 class DebateStatus(BaseModel):
     status: StatusValue
     round_number: int = 1
-    current_node: str | None = None  
+    max_rounds: int | None = None
+    current_node: str | None = None
     updated_at: datetime | None = None
     error: str | None = None
+
+
+class Meta(BaseModel):
+    """`GET /meta`."""
+
+    horizons: list[str]
+    backtest_start: date
+    backtest_end: date
+    max_rounds: int
 
 
 class HistoryEntry(BaseModel):

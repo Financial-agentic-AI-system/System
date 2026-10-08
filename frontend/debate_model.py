@@ -11,7 +11,6 @@ everything after it belongs to the new round.
 
 from dataclasses import dataclass, field
 
-import config
 from models import (
     AgentReport,
     CriticFeedback,
@@ -101,7 +100,8 @@ def describe_progress(rounds: list[RoundView], status: DebateStatus) -> str:
 
     cur = rounds[-1]
     if cur.critic:
-        if not cur.critic.agree and cur.number < config.MAX_ROUNDS:
+        limit_left = status.max_rounds is None or cur.number < status.max_rounds
+        if not cur.critic.agree and limit_left:
             return "The Critic disagreed — the PM is choosing which agents to re-ask."
         return "Assembling the final prediction."
     if cur.pm_opinion:

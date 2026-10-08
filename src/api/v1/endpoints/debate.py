@@ -5,6 +5,7 @@ off the Redis cache that the worker fills while the graph streams
 
 from fastapi import APIRouter, HTTPException
 
+from src.agents.state import MAX_ROUNDS
 from src.api.v1.schemas import DebateStatusResponse, HistoryResponse
 from src.cache import debate_cache
 
@@ -18,7 +19,7 @@ def get_debate_status(task_id: str) -> DebateStatusResponse:
     status = debate_cache.get_status(task_id)
     if status is None:
         raise HTTPException(status_code=404, detail=_UNKNOWN_TASK)
-    return DebateStatusResponse(**status.model_dump())
+    return DebateStatusResponse(**status.model_dump(), max_rounds=MAX_ROUNDS)
 
 
 @router.get("/history/{task_id}", response_model=HistoryResponse)

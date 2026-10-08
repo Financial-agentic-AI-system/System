@@ -104,8 +104,9 @@ flowchart TD
 | --- | --- | --- |
 | `POST` | `/api/v1/predict/start` | Enqueue a debate. Body: `{"ticker": "TSLA", "horizon": "1W", "as_of_date": "2026-01-15"}` (`horizon` ∈ `1W`/`1M`/`3M`; `as_of_date` is required — the worker needs the point-in-time anchor, and it cannot be in the future) → `202` with `task_id`. `422` on an invalid body or a ticker that is not in the database, `503` if Redis/the broker/the database is down |
 | `GET` | `/api/v1/predict/result/{task_id}` | Poll/fetch the final prediction (§5) |
-| `GET` | `/api/v1/debate_status/{task_id}` | Live status of an in-progress debate (round number, which agents are active) |
+| `GET` | `/api/v1/debate_status/{task_id}` | Live status of an in-progress debate (round number, which agents are active, `max_rounds`) |
 | `GET` | `/api/v1/history/{task_id}` | Full transcript of the debate so far (or of a just-finished one) |
+| `GET` | `/api/v1/meta` | Settings for the frontend form: `horizons`, `backtest_start`, `backtest_end`, `max_rounds` |
 | `GET` | `/api/v1/tickers` | Tickers with data in the database → `{"tickers": ["AAPL", ...]}`. `503` if the database is down |
 
 Data ingestion has no endpoint by design (see note in §1) — a developer runs
