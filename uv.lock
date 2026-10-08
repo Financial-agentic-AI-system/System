@@ -1624,7 +1624,6 @@ dependencies = [
     { name = "redis" },
     { name = "requests" },
     { name = "sqlalchemy" },
-    { name = "streamlit" },
     { name = "uvicorn" },
     { name = "yfinance" },
 ]
@@ -1642,6 +1641,12 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
+]
+frontend = [
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "streamlit" },
+    { name = "tzdata" },
 ]
 
 [package.metadata]
@@ -1664,7 +1669,6 @@ requires-dist = [
     { name = "requests" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "sqlalchemy" },
-    { name = "streamlit" },
     { name = "uvicorn" },
     { name = "yfinance" },
 ]
@@ -1677,6 +1681,12 @@ dev = [
     { name = "pre-commit", specifier = ">=3.0.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "ruff", specifier = ">=0.3.0" },
+]
+frontend = [
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "streamlit" },
+    { name = "tzdata" },
 ]
 
 [[package]]
