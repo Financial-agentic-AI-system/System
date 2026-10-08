@@ -6,10 +6,7 @@ from components import open_task, page_footer
 from models import ApiError
 
 st.title("History")
-st.caption(
-    "There is no 'list debates' endpoint and Redis keeps debates for 24 h only, "
-    "so this lists the debates opened in this session."
-)
+st.caption("Debates started or opened in this session.")
 
 client = get_client()
 

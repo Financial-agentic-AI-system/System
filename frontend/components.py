@@ -207,15 +207,14 @@ def load_meta() -> Meta:
 
 
 def page_footer() -> None:
-    text = "Academic research prototype (engineering thesis). Not financial advice."
+    text = "Research prototype, not financial advice."
     try:
         meta = load_meta()
     except ApiError:
         pass
     else:
         text += (
-            " Data is limited to the "
-            f"{meta.backtest_start:%Y-%m-%d} – {meta.backtest_end:%Y-%m-%d} "
-            "backtest window."
+            f" Backtest window: {meta.backtest_start:%Y-%m-%d} – "
+            f"{meta.backtest_end:%Y-%m-%d}."
         )
     st.caption(text)

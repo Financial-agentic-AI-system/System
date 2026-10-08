@@ -50,10 +50,7 @@ with st.form("new_analysis"):
     submitted = st.form_submit_button("Start debate", type="primary")
 
 st.info(
-    "**Point-in-time analysis.** Every query the agents make is filtered to "
-    "`date <= as-of date`, and the LLM's training cutoff (Dec 2023) precedes the "
-    f"backtest window ({meta.backtest_start:%Y-%m-%d} – "
-    f"{meta.backtest_end:%Y-%m-%d}), so the debate cannot see the future.",
+    "**Point-in-time analysis.** Agents only see data published up to the as-of date.",
     icon=":material/schedule:",
 )
 
@@ -65,8 +62,7 @@ with st.expander("How the debate works"):
 3. The PM synthesizes one opinion (direction, confidence, arguments).
 4. The **Critic** checks the PM's opinion against the agents' reports.
 5. If the Critic agrees, or after **{meta.max_rounds} rounds**, the prediction
-   is returned.
-   Otherwise the PM re-asks only the agents relevant to the Critic's objection.
+   is returned. Otherwise the PM re-asks the relevant agents.
 """
     )
 
