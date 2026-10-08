@@ -29,6 +29,15 @@ def _fake_redis(monkeypatch):
     return fake
 
 
+@pytest.fixture(autouse=True)
+def _known_tickers(monkeypatch):
+    """The database knows AAPL and TSLA; no real database is used."""
+    from contextlib import nullcontext
+
+    monkeypatch.setattr(predict, "get_session", lambda: nullcontext())
+    monkeypatch.setattr(predict, "fetch_tickers", lambda session: ["AAPL", "TSLA"])
+
+
 @pytest.fixture
 def sent(monkeypatch):
     """Records every send_task call instead of talking to a broker."""
@@ -119,6 +128,34 @@ def test_start_enqueues_task_and_returns_task_id(client, sent):
 def test_start_rejects_invalid_body(client, sent, body):
     resp = client.post("/api/v1/predict/start", json=body)
     assert resp.status_code == 422
+    assert sent == []
+
+
+def test_start_rejects_ticker_not_in_database(client, sent):
+    resp = client.post(
+        "/api/v1/predict/start",
+        json={"ticker": "ZZZ", "horizon": "1W", "as_of_date": AS_OF},
+    )
+
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Unknown ticker 'ZZZ'. Available: AAPL, TSLA."
+    assert sent == []  # nothing reaches the agents
+    assert debate_cache.redis_client.keys("*") == []
+
+
+def test_start_returns_503_when_database_is_down(client, sent, monkeypatch):
+    from sqlalchemy.exc import OperationalError as DatabaseError
+
+    def boom(session):
+        raise DatabaseError("SELECT", {}, Exception("connection refused"))
+
+    monkeypatch.setattr(predict, "fetch_tickers", boom)
+    resp = client.post(
+        "/api/v1/predict/start",
+        json={"ticker": "AAPL", "horizon": "1W", "as_of_date": AS_OF},
+    )
+
+    assert resp.status_code == 503
     assert sent == []
 
 

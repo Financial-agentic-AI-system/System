@@ -13,6 +13,8 @@ from src.api.v1.schemas import (
 )
 from src.cache import debate_cache
 from src.cache.schemas import TaskMeta
+from src.db.queries import fetch_tickers
+from src.db.session import get_session
 from src.worker.celery_app import app as celery_app
 
 # Dispatch by name, not by importing `src.worker.tasks`: importing it would
@@ -25,6 +27,14 @@ router = APIRouter(prefix="/predict", tags=["predict"])
 @router.post("/start", response_model=PredictStartResponse, status_code=202)
 def start_prediction(request: PredictStartRequest) -> PredictStartResponse:
     """Enqueue a debate and return its `task_id` immediately."""
+    with get_session() as session:
+        known = fetch_tickers(session)
+    if request.ticker not in known:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown ticker '{request.ticker}'. Available: {', '.join(known)}.",
+        )
+
     task_id = uuid4().hex
 
     # Written *before* dispatch so a client polling straight away never gets a
