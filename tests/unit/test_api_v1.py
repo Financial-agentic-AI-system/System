@@ -278,10 +278,10 @@ def test_result_done_returns_full_envelope(client):
     assert body["error"] is None
 
 
-def test_result_done_but_result_expired_is_404(client):
+def test_result_done_but_result_missing_is_500(client):
     _seed()
     debate_cache.set_status("t1", "DONE", round_number=1, current_node="finalize")
-    assert client.get("/api/v1/predict/result/t1").status_code == 404
+    assert client.get("/api/v1/predict/result/t1").status_code == 500
 
 
 def test_result_failed_carries_error_and_no_result(client):

@@ -84,7 +84,8 @@ def get_prediction_result(task_id: str) -> PredictResultResponse:
         result = debate_cache.get_result(task_id)
         if result is None:
             raise HTTPException(
-                status_code=404, detail="The debate is done but its result expired."
+                status_code=500,
+                detail="The debate is DONE but its result is missing from the cache.",
             )
 
     finished = status.status in {"DONE", "FAILED"}
