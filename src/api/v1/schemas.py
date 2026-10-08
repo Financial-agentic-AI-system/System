@@ -67,6 +67,10 @@ class DebateStatusResponse(DebateStatus):
     """Same fields as the cached `DebateStatus`."""
 
 
+class TickersResponse(BaseModel):
+    tickers: list[str]
+
+
 class HistoryResponse(BaseModel):
     task_id: str
     history: list[HistoryEntry]

@@ -98,6 +98,13 @@ class BackendClient:
         except (KeyError, TypeError) as exc:
             raise ApiError("Response of /predict/start has no task_id") from exc
 
+    def tickers(self) -> list[str]:
+        payload = self._request("GET", "/tickers")
+        try:
+            return [str(t) for t in payload["tickers"]]
+        except (KeyError, TypeError) as exc:
+            raise ApiError("Response of /tickers has no ticker list") from exc
+
     def status(self, task_id: str) -> DebateStatus:
         payload = self._request("GET", f"/debate_status/{task_id}")
         return self._parse(DebateStatus, payload)

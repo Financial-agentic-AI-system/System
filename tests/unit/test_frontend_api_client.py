@@ -183,3 +183,11 @@ def test_health(http):
     assert client.health() is True
     assert calls[0][1] == "http://api:8000/health"
     assert client.health() is False
+
+
+def test_tickers(http):
+    queue, calls = http
+    queue.append(FakeResponse(payload={"tickers": ["AAPL", "TSLA"]}))
+
+    assert _client().tickers() == ["AAPL", "TSLA"]
+    assert calls[0][:2] == ("GET", "http://api:8000/api/v1/tickers")

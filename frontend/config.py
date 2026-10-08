@@ -15,15 +15,6 @@ TIMEZONE = os.getenv("TZ", "")
 REQUEST_TIMEOUT_S = 10
 HEALTH_TIMEOUT_S = 3
 
-# The datalake only holds 9 tickers and there is no "list tickers"
-# endpoint, so the selector is configured here (comma-separated env var).
-DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA"
-TICKERS = [
-    t.strip().upper()
-    for t in os.getenv("TICKERS", DEFAULT_TICKERS).split(",")
-    if t.strip()
-]
-
 # horizon code sent to the backend -> label shown to the user
 HORIZONS = {"1W": "1 week", "1M": "1 month", "3M": "3 months"}
 

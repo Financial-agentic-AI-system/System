@@ -261,3 +261,52 @@ def test_result_failed_carries_error_and_no_result(client):
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
+
+
+# --------------------------------------------------------------------------- #
+# GET /tickers
+# --------------------------------------------------------------------------- #
+def test_tickers_come_from_the_database(client, monkeypatch):
+    from contextlib import nullcontext
+
+    from src.api.v1.endpoints import tickers
+
+    monkeypatch.setattr(tickers, "get_session", lambda: nullcontext())
+    monkeypatch.setattr(tickers, "fetch_tickers", lambda session: ["AAPL", "TSLA"])
+
+    resp = client.get("/api/v1/tickers")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"tickers": ["AAPL", "TSLA"]}
+
+
+def test_tickers_returns_503_when_database_is_down(client, monkeypatch):
+    from contextlib import nullcontext
+
+    from sqlalchemy.exc import OperationalError
+
+    from src.api.v1.endpoints import tickers
+
+    def boom(session):
+        raise OperationalError("SELECT", {}, Exception("connection refused"))
+
+    monkeypatch.setattr(tickers, "get_session", lambda: nullcontext())
+    monkeypatch.setattr(tickers, "fetch_tickers", boom)
+
+    assert client.get("/api/v1/tickers").status_code == 503
+
+
+def test_fetch_tickers_query():
+    from sqlalchemy.dialects import postgresql
+
+    from src.db.queries import fetch_tickers
+
+    class _Session:
+        def scalars(self, stmt):
+            self.sql = str(stmt.compile(dialect=postgresql.dialect()))
+            return ["AAPL"]
+
+    session = _Session()
+    assert fetch_tickers(session) == ["AAPL"]
+    assert "SELECT DISTINCT stock_prices.symbol" in session.sql
+    assert "ORDER BY stock_prices.symbol" in session.sql

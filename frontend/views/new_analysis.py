@@ -16,9 +16,24 @@ st.caption(
 
 DEFAULT_AS_OF = date(2026, 1, 15)
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _load_tickers() -> list[str]:
+    return get_client().tickers()
+
+
+try:
+    tickers = _load_tickers()
+except ApiError as exc:
+    st.error(f"Cannot load the ticker list. {exc}")
+    st.stop()
+if not tickers:
+    st.warning("The database has no tickers yet. Load the datalake first.")
+    st.stop()
+
 with st.form("new_analysis"):
     c1, c2, c3 = st.columns(3)
-    ticker = c1.selectbox("Ticker", config.TICKERS)
+    ticker = c1.selectbox("Ticker", tickers)
     horizon = c2.selectbox(
         "Investment horizon",
         list(config.HORIZONS),

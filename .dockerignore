@@ -1,4 +1,3 @@
-# Secrets and local state must never end up in an image layer.
 .env
 .env.*
 !.env.example

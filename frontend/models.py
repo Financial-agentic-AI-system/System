@@ -54,7 +54,7 @@ class PredictResult(BaseModel):
 class DebateStatus(BaseModel):
     status: StatusValue
     round_number: int = 1
-    current_node: str | None = None  # last finished node
+    current_node: str | None = None  
     updated_at: datetime | None = None
     error: str | None = None
 

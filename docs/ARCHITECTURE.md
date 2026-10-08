@@ -106,6 +106,7 @@ flowchart TD
 | `GET` | `/api/v1/predict/result/{task_id}` | Poll/fetch the final prediction (§5) |
 | `GET` | `/api/v1/debate_status/{task_id}` | Live status of an in-progress debate (round number, which agents are active) |
 | `GET` | `/api/v1/history/{task_id}` | Full transcript of the debate so far (or of a just-finished one) |
+| `GET` | `/api/v1/tickers` | Tickers with data in the database → `{"tickers": ["AAPL", ...]}`. `503` if the database is down |
 
 Data ingestion has no endpoint by design (see note in §1) — a developer runs
 `data_scripts/*` and the transformer manually.
