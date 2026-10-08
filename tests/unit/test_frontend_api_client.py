@@ -211,3 +211,16 @@ def test_meta(http):
     assert calls[0][:2] == ("GET", "http://api:8000/api/v1/meta")
     assert meta.horizons == ["1W", "1M"] and meta.max_rounds == 3
     assert meta.backtest_end == date(2026, 6, 30)
+
+
+def test_api_error_carries_http_status(http):
+    queue, _ = http
+    queue += [FakeResponse(404, {"detail": "gone"}), requests.ConnectionError("x")]
+
+    with pytest.raises(ApiError) as not_found:
+        _client().status("abc")
+    assert not_found.value.status_code == 404
+
+    with pytest.raises(ApiError) as unreachable:
+        _client().status("abc")
+    assert unreachable.value.status_code is None

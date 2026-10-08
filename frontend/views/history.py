@@ -22,11 +22,18 @@ else:
         header, ["Started", "Ticker", "Horizon", "As-of date", "Status", ""]
     ):
         col.markdown(f"**{title}**")
+    backend_error = None
     for run in runs[:30]:
-        try:
-            status = client.status(run["task_id"]).status
-        except ApiError:
-            status = "EXPIRED"
+        status = "UNKNOWN"
+        if backend_error is None:
+            try:
+                status = client.status(run["task_id"]).status
+            except ApiError as exc:
+                if exc.status_code == 404:
+                    status = "EXPIRED"
+                else:
+                    backend_error = exc
+                    st.warning(str(exc))
         cols = st.columns([2, 1, 1, 1, 1, 1])
         cols[0].write(run["started_at"])
         cols[1].write(run["ticker"])

@@ -74,7 +74,7 @@ class BackendClient:
         except requests.RequestException as exc:
             raise ApiError(f"Cannot reach the backend at {url}: {exc}") from exc
         if not resp.ok:
-            raise ApiError(_error_message(resp, url))
+            raise ApiError(_error_message(resp, url), resp.status_code)
         try:
             return resp.json()
         except ValueError as exc:

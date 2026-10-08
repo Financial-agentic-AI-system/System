@@ -16,7 +16,13 @@ AgentName = Literal["financial", "sentiment", "macro"]
 
 
 class ApiError(RuntimeError):
-    """Backend unreachable, returned an error, or sent an unexpected body."""
+    """Backend unreachable, returned an error, or sent an unexpected body.
+    `status_code` is None when there was no HTTP response.
+    """
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class AgentReport(BaseModel):

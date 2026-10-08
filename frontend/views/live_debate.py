@@ -36,8 +36,11 @@ def _render_state() -> bool:
         status = client.status(task_id)
         history = client.history(task_id)
     except ApiError as exc:
-        st.error(str(exc))
-        return True  # stop polling; the user can navigate away and back
+        if exc.status_code == 404:
+            st.error(str(exc))
+            return True
+        st.warning(f"{exc} Retrying…")
+        return False
 
     rounds = build_rounds(history)
     live = not is_terminal(status)
