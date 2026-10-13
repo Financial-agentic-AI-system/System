@@ -12,4 +12,4 @@ RUN uv sync --frozen --no-install-project --no-default-groups
 COPY . .
 RUN uv sync --frozen --no-default-groups
 
-CMD ["uv", "run", "celery", "-A", "src.worker.celery_app", "worker", "--loglevel=info"]
+CMD ["uv", "run", "--no-sync", "celery", "-A", "src.worker.celery_app", "worker", "--loglevel=info"]
