@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 
 Direction = Literal["BUY", "HOLD", "SELL"]
 
+MAX_ROUNDS = 3
+
 
 class AgentReport(BaseModel):
     opinion: str

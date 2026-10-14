@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.vscode
+.venv
+venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+
+notebooks
+docs
+tests

@@ -65,6 +65,10 @@ def _run_debate(
 
 
 @app.task(bind=True)
-def run_debate(self, ticker: str, horizon: str, as_of_date: date) -> dict:
+def run_debate(self, ticker: str, horizon: str, as_of_date: date | str) -> dict:
+    # The JSON task serializer hands a date over the broker as an ISO string
+    # (the API sends one on purpose); convert back before it reaches the graph.
+    if isinstance(as_of_date, str):
+        as_of_date = date.fromisoformat(as_of_date)
     result = _run_debate(ticker, horizon, as_of_date, task_id=self.request.id)
     return result.model_dump(mode="json")

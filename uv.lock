@@ -1624,7 +1624,6 @@ dependencies = [
     { name = "redis" },
     { name = "requests" },
     { name = "sqlalchemy" },
-    { name = "streamlit" },
     { name = "uvicorn" },
     { name = "yfinance" },
 ]
@@ -1638,9 +1637,16 @@ dev = [
 [package.dev-dependencies]
 dev = [
     { name = "fakeredis" },
+    { name = "httpx" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
+]
+frontend = [
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "streamlit" },
+    { name = "tzdata" },
 ]
 
 [package.metadata]
@@ -1663,7 +1669,6 @@ requires-dist = [
     { name = "requests" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "sqlalchemy" },
-    { name = "streamlit" },
     { name = "uvicorn" },
     { name = "yfinance" },
 ]
@@ -1672,9 +1677,16 @@ provides-extras = ["dev"]
 [package.metadata.requires-dev]
 dev = [
     { name = "fakeredis", specifier = ">=2.20.0" },
+    { name = "httpx" },
     { name = "pre-commit", specifier = ">=3.0.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "ruff", specifier = ">=0.3.0" },
+]
+frontend = [
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "streamlit" },
+    { name = "tzdata" },
 ]
 
 [[package]]

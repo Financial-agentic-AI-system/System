@@ -32,6 +32,8 @@ services:
       - backtest-net
 
   backend:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
@@ -50,12 +52,16 @@ services:
         condition: service_healthy
 
   worker:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: docker/Dockerfile.worker
     volumes:
       - ../datalake:/datalake:ro
       - ./.env:/app/.env
+      # Google Application Default Credentials (`gcloud auth application-default login`)
+      - ${APPDATA}/gcloud:/root/.config/gcloud:ro
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/mas_db
       - REDIS_URL=redis://redis:6379/0
@@ -78,6 +84,8 @@ services:
   # Not started by a plain `docker compose up`. Run with:
   #   docker compose --profile backtest up backtest-worker backtest-proxy
   backtest-worker:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: docker/Dockerfile.worker

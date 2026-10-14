@@ -15,7 +15,6 @@ dependencies = [
     "sqlalchemy",
     "psycopg2-binary",
     "pgvector",
-    "streamlit",
     "pydantic",
     "pydantic-settings",
     "alpha-vantage",
@@ -37,8 +36,19 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.3.0",
     "pre-commit>=3.0.0",
-    "fakeredis>=2.20.0"
+    "fakeredis>=2.20.0",
+    "httpx"  # fastapi.testclient (tests/unit/test_api_v1.py)
 ]
+# Everything the frontend container needs; it does not ship src/.
+frontend = [
+    "streamlit",
+    "requests",
+    "pydantic",
+    "tzdata"
+]
+
+[tool.uv]
+default-groups = ["dev", "frontend"]
 
 # Konfiguracja testów jednostkowych
 [tool.pytest.ini_options]

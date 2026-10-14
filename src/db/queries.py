@@ -99,3 +99,9 @@ def fetch_recent_articles(
         .limit(limit)
     )
     return list(session.scalars(stmt))
+
+
+def fetch_tickers(session: Session) -> list[str]:
+    """Tickers that have price data, sorted."""
+    stmt = select(StockPrice.symbol).distinct().order_by(StockPrice.symbol)
+    return list(session.scalars(stmt))
