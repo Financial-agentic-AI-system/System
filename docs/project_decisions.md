@@ -40,3 +40,7 @@ published after `as_of_date` is visible.
 - **Storage.** `summary_embedding` and `title_summary_embedding` are stored
   side by side so the retriever can compare the two variants. They are
   filled by `python -m src.db.load`.
+- **Search defaults: `title_summary`, similarity ≥ 0.5.** On AAPL articles an
+  unrelated control query scored at most 0.42, relevant queries' 10th hit at
+  least 0.51; `title_summary` separated the two slightly better. Re-check with
+  `notebooks/similarity_threshold.ipynb`.

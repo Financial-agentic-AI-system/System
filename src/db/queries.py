@@ -83,6 +83,13 @@ def fetch_macro_series(
     return list(session.scalars(stmt))
 
 
+# The 768-float vectors are never needed by callers; no need to load them into memory.
+_WITHOUT_EMBEDDINGS = (
+    defer(ArticleSummary.summary_embedding),
+    defer(ArticleSummary.title_summary_embedding),
+)
+
+
 def fetch_recent_articles(
     session: Session, ticker: str, as_of_date: date, limit: int = 10
 ) -> list[ArticleSummary]:
@@ -93,6 +100,7 @@ def fetch_recent_articles(
     """
     stmt = (
         select(ArticleSummary)
+        .options(*_WITHOUT_EMBEDDINGS)
         .where(
             ArticleSummary.symbol == ticker,
             ArticleSummary.time_published < as_of_date + timedelta(days=1),
@@ -105,6 +113,10 @@ def fetch_recent_articles(
 
 EmbeddingVariant = Literal["summary", "title_summary"]
 
+# Calibration: docs/project_decisions.md.
+DEFAULT_MIN_SIMILARITY = 0.5
+DEFAULT_VARIANT: EmbeddingVariant = "title_summary"
+
 
 def fetch_similar_articles(
     session: Session,
@@ -112,32 +124,30 @@ def fetch_similar_articles(
     as_of_date: date,
     query_embedding: Sequence[float],
     limit: int = 10,
-    variant: EmbeddingVariant = "summary",
-) -> list[ArticleSummary]:
-    """The `limit` articles closest (cosine) to `query_embedding`, published
-    on or before `as_of_date`. `variant` picks which embedding column is
-    searched; articles without that embedding are skipped.
-
-    Same day-inclusive bound as `fetch_recent_articles`. The query vector
-    comes from `src.retriever.embeddings.embed_query`.
+    variant: EmbeddingVariant = DEFAULT_VARIANT,
+    min_similarity: float | None = DEFAULT_MIN_SIMILARITY,
+) -> list[tuple[ArticleSummary, float]]:
+    """Up to `limit` (article, cosine similarity) pairs, most similar first,
+    published on or before `as_of_date`. `variant` picks the embedding column;
+    articles without it, or below `min_similarity`, are skipped.
     """
     column = (
         ArticleSummary.summary_embedding
         if variant == "summary"
         else ArticleSummary.title_summary_embedding
     )
+    distance = column.cosine_distance(list(query_embedding))
     stmt = (
-        select(ArticleSummary)
-        .options(
-            defer(ArticleSummary.summary_embedding),
-            defer(ArticleSummary.title_summary_embedding),
-        )
+        select(ArticleSummary, (1 - distance).label("similarity"))
+        .options(*_WITHOUT_EMBEDDINGS)
         .where(
             ArticleSummary.symbol == ticker,
             ArticleSummary.time_published < as_of_date + timedelta(days=1),
             column.is_not(None),
         )
-        .order_by(column.cosine_distance(list(query_embedding)))
+        .order_by(distance)
         .limit(limit)
     )
-    return list(session.scalars(stmt))
+    if min_similarity is not None:
+        stmt = stmt.where(distance <= 1 - min_similarity)
+    return [(article, float(sim)) for article, sim in session.execute(stmt)]
