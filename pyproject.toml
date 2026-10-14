@@ -15,6 +15,7 @@ dependencies = [
     "sqlalchemy",
     "psycopg2-binary",
     "pgvector",
+    "tqdm",
     "streamlit",
     "pydantic",
     "pydantic-settings",

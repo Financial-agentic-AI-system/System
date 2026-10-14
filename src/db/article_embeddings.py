@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
+from tqdm import tqdm
 
 from src.db.models import ArticleSummary
 from src.retriever import embeddings
@@ -34,19 +35,16 @@ def _embed_column(
     embed: EmbedFn,
 ) -> int:
     ids = list(texts_by_id)
-    if ids:
-        print(f"    {column}: {len(ids)} to embed", flush=True)
-    for start in range(0, len(ids), _ROWS_PER_COMMIT):
-        chunk = ids[start : start + _ROWS_PER_COMMIT]
-        vectors = embed([texts_by_id[row_id] for row_id in chunk])
-        session.execute(
-            update(ArticleSummary),
-            [{"id": row_id, column: vec} for row_id, vec in zip(chunk, vectors)],
-        )
-        session.commit()
-        done = start + len(chunk)
-        if done % (_ROWS_PER_COMMIT * 10) == 0 or done == len(ids):
-            print(f"    {column}: {done}/{len(ids)}", flush=True)
+    with tqdm(total=len(ids), desc=column, unit="article", disable=not ids) as bar:
+        for start in range(0, len(ids), _ROWS_PER_COMMIT):
+            chunk = ids[start : start + _ROWS_PER_COMMIT]
+            vectors = embed([texts_by_id[row_id] for row_id in chunk])
+            session.execute(
+                update(ArticleSummary),
+                [{"id": row_id, column: vec} for row_id, vec in zip(chunk, vectors)],
+            )
+            session.commit()
+            bar.update(len(chunk))
     return len(ids)
 
 

@@ -91,7 +91,7 @@ def test_defaults_use_title_summary_and_threshold():
 
     where = _sql(session).split("WHERE")[1].split("ORDER BY")[0]
     assert "article_summaries.title_summary_embedding <=> " in where
-    assert "<= 0.55" in where
+    assert f"<= {1 - queries.DEFAULT_MIN_SIMILARITY}" in where
 
 
 def test_recent_articles_do_not_load_embeddings():
