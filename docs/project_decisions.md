@@ -39,4 +39,4 @@ published after `as_of_date` is visible.
   by `as_of_date`.
 - **Storage.** `summary_embedding` and `title_summary_embedding` are stored
   side by side so the retriever can compare the two variants. They are
-  filled by `python -m src.db.load`, not by a separate transformer script.
+  filled by `python -m src.db.load`.

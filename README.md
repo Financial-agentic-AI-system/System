@@ -69,3 +69,13 @@ In order to load data into db use:
 uv run python -m src.db.load
 ```
 This command will create tables and load data directly from Datalake.
+After the articles are loaded, the ones without an embedding are vectorized
+(needs `GCP_PROJECT_ID` and `gcloud auth application-default login`; skipped
+when `GCP_PROJECT_ID` is not set).
+
+```bash
+uv run python -m src.db.load --datasets fundamentals prices   # only some datasets
+uv run python -m src.db.load --datalake ../Datalake --no-init # custom path, skip table creation
+uv run python -m src.db.load --datasets articles              # (re)load articles + embed new ones
+uv run python -m src.db.load --no-embed                       # skip the embedding step
+```

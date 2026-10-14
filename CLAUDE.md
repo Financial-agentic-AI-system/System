@@ -38,7 +38,6 @@ debate protocol (round limit, termination condition), and
 | `src/agents/`        | LangGraph debate: `states.py`, `nodes.py`, `graph.py`, prompts in `prompts/*.yaml` via `prompt_loader.py`. No SQL here — read queries live in `src/db/queries.py` |
 | `src/api/v1/`        | FastAPI routes — 4 endpoints, see `endpoints/`                          |
 | `src/worker/`        | the ONLY Celery worker in this system — runs the LangGraph debate       |
-| `src/transformer/`   | one-off data transformer — NOT a Celery worker (see rule below)         |
 | `src/retriever/`     | LangChain semantic search + pgvector upsert                             |
 | `src/db/`            | SQLAlchemy models, session, Alembic migrations; `loaders.py` writes the datalake in, `queries.py` reads it back out |
 | `src/cache/`         | Redis client for live debate/agent status                               |
@@ -48,11 +47,12 @@ debate protocol (round limit, termination condition), and
 
 ## Critical rules
 
-- **IMPORTANT**: `src/transformer/` is a plain one-off script, never a Celery
-  task and never triggered by the backend. It's run manually by a developer:
-  `python -m src.transformer.transform --tickers AAPL,TSLA`. Same for data
-  ingestion (`data_scripts/*`) — there is no API endpoint for either; this is
-  a deliberate scope cut, not a gap (see `docs/ARCHITECTURE.md`).
+- **IMPORTANT**: loading the datalake into Postgres (and embedding the
+  articles) is a plain one-off script, never a Celery task and never
+  triggered by the backend. It's run manually by a developer:
+  `python -m src.db.load`. Same for data ingestion (`data_scripts/*`) — there
+  is no API endpoint for either; this is a deliberate scope cut, not a gap
+  (see `docs/ARCHITECTURE.md`).
 - **IMPORTANT**: agent prompts live in `src/agents/prompts/*.yaml` and are
   read through `prompt_loader.py`. Never hardcode a system prompt as a Python
   string inside `nodes.py`.
@@ -62,7 +62,7 @@ debate protocol (round limit, termination condition), and
   secrets.
 - The datalake is read-only from this repo's point of view. Never write into
   `/datalake`; derived data (embeddings, metadata) goes into Postgres/pgvector
-  through `src/retriever/vectorstore.py`.
+  through `src/db/load.py`.
 
 ## Commands
 
@@ -79,10 +79,10 @@ Run everything with Docker (Redis, Postgres/pgvector, backend, worker, frontend)
 docker compose up --build
 ```
 
-Run the data transformer manually (reuses the `backend` image, no dedicated service):
+Load the datalake into Postgres and embed the articles (see README.md):
 
 ```bash
-docker compose run --rm backend uv run python -m src.transformer.transform --tickers AAPL,TSLA
+uv run python -m src.db.load
 ```
 
 Fetch raw data from Alpha Vantage into the datalake:

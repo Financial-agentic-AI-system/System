@@ -1,15 +1,4 @@
-"""CLI for loading datalake data into Postgres.
-
-Examples:
-    python -m src.db.load                      # create tables and load everything
-    python -m src.db.load --datasets fundamentals prices
-    python -m src.db.load --datalake ../Datalake --no-init
-    python -m src.db.load --datasets articles  # (re)load + embed new articles
-    python -m src.db.load --no-embed           # skip the embedding step
-
-Articles without an embedding are vectorized after loading; skipped when
-GCP_PROJECT_ID is not set.
-"""
+"""CLI for loading datalake data into Postgres. Usage: see README.md."""
 
 import argparse
 
