@@ -151,3 +151,7 @@ def fetch_similar_articles(
     if min_similarity is not None:
         stmt = stmt.where(distance <= 1 - min_similarity)
     return [(article, float(sim)) for article, sim in session.execute(stmt)]
+def fetch_tickers(session: Session) -> list[str]:
+    """Tickers that have price data, sorted."""
+    stmt = select(StockPrice.symbol).distinct().order_by(StockPrice.symbol)
+    return list(session.scalars(stmt))

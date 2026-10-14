@@ -25,6 +25,7 @@ Thesis/
 
    # Sync dependencies from pyproject.toml
    uv sync
+   ```
 
 ## Development & Running
 
@@ -33,6 +34,41 @@ To run the full stack (Redis, Postgres/pgvector, backend, worker, frontend), use
 
 ```bash
 docker compose up --build
+```
+
+### Services and ports
+
+| Service | Address | What it is |
+| --- | --- | --- |
+| Frontend | http://localhost:8501 | Streamlit app: start a debate, watch it live, see the result |
+| Backend API | http://localhost:8000 | FastAPI; interactive docs at http://localhost:8000/docs |
+| Postgres (pgvector) | `localhost:5432` | user `user`, password `password`, database `mas_db` |
+| Redis | `localhost:6379` | Celery broker and live debate cache |
+| Worker | — | Celery worker that runs the debates; no port |
+
+### Using the system
+
+1. Start the stack: `docker compose up --build`.
+2. Load the data into the database (first run, or after the datalake changes):
+   `uv run python -m src.db.load`.
+3. Open http://localhost:8501, pick a ticker, horizon and as-of date, and
+   click **Start debate**.
+
+The same can be done through the API:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/predict/start \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL", "horizon": "1W", "as_of_date": "2026-01-15"}'
+curl http://localhost:8000/api/v1/predict/result/<task_id>
+```
+
+To work on the frontend without rebuilding its container, run everything else
+in Docker and the app locally:
+
+```bash
+docker compose up --build postgres redis backend worker
+uv run streamlit run frontend/app.py
 ```
 
 ## Local Development

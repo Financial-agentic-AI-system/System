@@ -1,0 +1,51 @@
+"""Page 4 — debates started or opened in this browser session."""
+
+import streamlit as st
+from api_client import get_client
+from components import open_task, page_footer
+from models import ApiError
+
+st.title("History")
+st.caption("Debates started or opened in this session.")
+
+client = get_client()
+
+runs = st.session_state.runs
+if not runs:
+    st.info("Nothing here yet — start an analysis first.")
+else:
+    header = st.columns([2, 1, 1, 1, 1, 1])
+    for col, title in zip(
+        header, ["Started", "Ticker", "Horizon", "As-of date", "Status", ""]
+    ):
+        col.markdown(f"**{title}**")
+    backend_error = None
+    for run in runs[:30]:
+        status = "UNKNOWN"
+        if backend_error is None:
+            try:
+                status = client.status(run["task_id"]).status
+            except ApiError as exc:
+                if exc.status_code == 404:
+                    status = "EXPIRED"
+                else:
+                    backend_error = exc
+                    st.warning(str(exc))
+        cols = st.columns([2, 1, 1, 1, 1, 1])
+        cols[0].write(run["started_at"])
+        cols[1].write(run["ticker"])
+        cols[2].write(run["horizon"])
+        cols[3].write(run["as_of_date"])
+        cols[4].write(status)
+        if cols[5].button("Open", key=f"open_{run['task_id']}"):
+            open_task(client, run["task_id"])
+
+st.divider()
+st.subheader("Open by task ID")
+with st.form("open_by_id"):
+    typed = st.text_input("Task ID", placeholder="c3f1…")
+    go = st.form_submit_button("Open")
+if go and typed.strip():
+    open_task(client, typed.strip())
+
+page_footer()
