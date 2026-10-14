@@ -32,12 +32,20 @@ class _FakeSessionCM:
 
 @pytest.fixture(autouse=True)
 def _no_real_db(monkeypatch):
-    """None of these tests should ever touch Postgres — CI has no DB service."""
+    """None of these tests should ever touch Postgres — CI has no DB service.
+
+    The Sentiment agent may ask the model for a search: `generate_tool_calls`
+    answers "no search needed", so neither the endpoint nor the retriever runs.
+    """
     monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
     monkeypatch.setattr(nodes, "fetch_fundamentals", lambda *a, **k: [])
     monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: [])
     monkeypatch.setattr(nodes, "fetch_macro_series", lambda *a, **k: [])
     monkeypatch.setattr(nodes, "fetch_recent_articles", lambda *a, **k: [])
+    monkeypatch.setattr(nodes, "fetch_articles_by_ids", lambda *a, **k: [])
+    monkeypatch.setattr(
+        llm_client, "generate_tool_calls", lambda prompt, tools: [], raising=False
+    )
 
 
 def _initial_state(**overrides) -> DebateState:
@@ -50,6 +58,8 @@ def _initial_state(**overrides) -> DebateState:
         "financial_report": None,
         "sentiment_report": None,
         "macro_report": None,
+        "sentiment_queries": [],
+        "sentiment_sources": [],
         "pm_opinion": None,
         "critic_feedback": None,
         "final_result": None,

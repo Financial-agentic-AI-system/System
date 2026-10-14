@@ -94,6 +94,45 @@ def render_rounds(rounds: list[RoundView], live: bool) -> None:
             parts.append(_pill("Critic", states["critic"]))
         st.markdown(f"**Round {view.number}**")
         st.markdown("".join(parts), unsafe_allow_html=True)
+        if view.queries:
+            st.caption(
+                f"🔎 Sentiment ran {len(view.queries)} search(es) and found "
+                f"{len(view.sources)} new article(s)"
+            )
+
+
+def _render_sentiment_search(delta: dict) -> None:
+    """The Sentiment agent's queries and the articles they found.
+
+    Only called when the delta has `sentiment_queries` at all: histories
+    recorded before the search existed must not claim "no search needed".
+    """
+    queries = delta["sentiment_queries"]
+    sources = delta.get("sentiment_sources", [])
+    if not queries:
+        st.caption("🔎 No search needed: the recent articles were enough")
+        return
+    st.caption("🔎 Searched: " + " · ".join(f'"{md(q)}"' for q in queries))
+    with st.expander(f"Retrieved articles ({len(sources)})"):
+        if not sources:
+            st.caption(
+                "Nothing above the similarity threshold that the agent had "
+                "not already seen."
+            )
+        for source in sources:
+            title = md(source.get("title") or "(untitled)")
+            title = title.replace("[", "(").replace("]", ")")  # keep the link intact
+            link = f"[{title}]({source['url']})" if source.get("url") else title
+            origin = " · ".join(
+                part
+                for part in (source.get("source"), (source.get("published") or "")[:10])
+                if part
+            )
+            st.markdown(
+                f"- {link}  \n  {origin} · similarity "
+                f"**{source['similarity']:.2f}** · found by "
+                f'"{md(source["query"])}"'
+            )
 
 
 def user_tz() -> tzinfo:
@@ -133,6 +172,8 @@ def render_transcript(history: list[HistoryEntry]) -> None:
             with st.chat_message("assistant", avatar=AVATARS[node]):
                 st.markdown(f"**{AGENT_LABELS[node]} Agent** · {stamp}")
                 st.markdown(md(report["opinion"]))
+                if node == "sentiment" and "sentiment_queries" in delta:
+                    _render_sentiment_search(delta)
                 with st.expander("Reasoning"):
                     st.markdown(md(report["reasoning"]))
         elif node == "pm_synthesize":

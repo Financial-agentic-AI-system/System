@@ -35,6 +35,8 @@ class RoundView:
     reports: dict[str, AgentReport] = field(default_factory=dict)
     pm_opinion: PMOpinion | None = None
     critic: CriticFeedback | None = None
+    queries: list[str] = field(default_factory=list)
+    sources: list[dict] = field(default_factory=list)
 
 
 def is_terminal(status: DebateStatus) -> bool:
@@ -49,6 +51,9 @@ def build_rounds(history: list[HistoryEntry]) -> list[RoundView]:
             view.reports[entry.node] = AgentReport.model_validate(
                 entry.delta[f"{entry.node}_report"]
             )
+            if entry.node == "sentiment":
+                view.queries = list(entry.delta.get("sentiment_queries", []))
+                view.sources = list(entry.delta.get("sentiment_sources", []))
         elif entry.node == "pm_synthesize":
             view.pm_opinion = PMOpinion.model_validate(entry.delta["pm_opinion"])
         elif entry.node == "critic":

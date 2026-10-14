@@ -44,3 +44,30 @@ published after `as_of_date` is visible.
   unrelated control query scored at most 0.42, relevant queries' 10th hit at
   least 0.51; `title_summary` separated the two slightly better. Re-check with
   `notebooks/similarity_threshold.ipynb`.
+
+## 2026-10-14 — Sentiment agent: the model asks for a search, the code runs it
+
+- **Tool calling, one call, a list of queries.** The agent first sees the 10
+  most recent articles and may call `search_articles` with up to 3 queries
+  (`generate_tool_calls`); it can also decline. The smoke test against the MaaS
+  endpoint returned well-formed `tool_calls`. A list in one call, instead of a
+  loop of turns, keeps it two LLM calls per round: one to choose queries, one
+  (the usual `generate_structured`) for the opinion.
+- **The model names queries, nothing else.** `ticker` and `as_of_date` are not
+  in the tool's schema; the code takes them from the state, so the
+  point-in-time bound cannot be argued away. The schema is a Pydantic model
+  (`src/agents/tools.py`) that also validates the arguments.
+- **Every round, not only the first.** On a re-ask the agent sees the Critic's
+  feedback and the queries it already used, and re-reads the articles found in
+  earlier rounds (by id, from the state).
+- **State accumulates, history shows the round.** `sentiment_queries` and
+  `sentiment_sources` use `operator.add` reducers: a node returns only its own
+  round's values, so the history delta (Redis, 24 h) is per-round while the
+  state is cumulative. Queries and found articles are shown on the frontend;
+  they are not part of `PredictResult`.
+- **Failures.** A model that skips the tool or returns broken arguments falls
+  back to the recent articles. An embedding or SQL error fails the debate: a run
+  that silently skipped retrieval would look valid yet not be comparable.
+- **Ablation switch.** `SENTIMENT_RETRIEVAL=0` leaves out the search entirely
+  (docs/evaluation.md §4). At most 3 queries per round, 5 articles per query,
+  on top of the retriever's 0.5 similarity threshold.

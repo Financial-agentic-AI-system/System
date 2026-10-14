@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, defer
 
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
@@ -151,6 +151,61 @@ def fetch_similar_articles(
     if min_similarity is not None:
         stmt = stmt.where(distance <= 1 - min_similarity)
     return [(article, float(sim)) for article, sim in session.execute(stmt)]
+
+
+def fetch_articles_by_ids(
+    session: Session, ticker: str, as_of_date: date, ids: Sequence[int]
+) -> list[ArticleSummary]:
+    """Articles found in earlier rounds, newest first.
+
+    The debate state keeps only ids (small history deltas), so the text is read
+    back here. Ticker and date are filtered again, defensively, like every
+    other query in this module.
+    """
+    if not ids:
+        return []
+    stmt = (
+        select(ArticleSummary)
+        .options(*_WITHOUT_EMBEDDINGS)
+        .where(
+            ArticleSummary.id.in_(ids),
+            ArticleSummary.symbol == ticker,
+            ArticleSummary.time_published < as_of_date + timedelta(days=1),
+        )
+        .order_by(ArticleSummary.time_published.desc())
+    )
+    return list(session.scalars(stmt))
+
+
+def count_articles_without_embedding(
+    session: Session,
+    ticker: str,
+    as_of_date: date,
+    variant: EmbeddingVariant = DEFAULT_VARIANT,
+) -> int:
+    """Articles that have text but no vector — `fetch_similar_articles` skips
+    them silently, so a non-zero count means retrieval sees a partial corpus
+    (an unfinished `python -m src.db.load`).
+    """
+    if variant == "summary":
+        column = ArticleSummary.summary_embedding
+        has_text = ArticleSummary.summary != ""
+    else:
+        column = ArticleSummary.title_summary_embedding
+        has_text = or_(ArticleSummary.summary != "", ArticleSummary.title != "")
+    stmt = (
+        select(func.count())
+        .select_from(ArticleSummary)
+        .where(
+            ArticleSummary.symbol == ticker,
+            ArticleSummary.time_published < as_of_date + timedelta(days=1),
+            column.is_(None),
+            has_text,
+        )
+    )
+    return session.scalar(stmt) or 0
+
+
 def fetch_tickers(session: Session) -> list[str]:
     """Tickers that have price data, sorted."""
     stmt = select(StockPrice.symbol).distinct().order_by(StockPrice.symbol)

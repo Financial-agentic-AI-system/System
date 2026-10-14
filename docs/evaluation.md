@@ -49,7 +49,11 @@ leakage channels** — the design closes all three, not just one:
   `src/agents/llm_client.py` must not attach a `google_search` /
   `google_search_retrieval` tool to any call used during backtests.
   Verification step: inspect the outgoing request payload during a backtest
-  run and confirm no search/grounding tool is attached.
+  run and confirm no search/grounding tool is attached. The one tool that
+  *is* sent is our own local function `search_articles` (`generate_tool_calls`,
+  Sentiment agent only): the model only names its queries, and the code runs
+  them against the point-in-time database. So the check is "the only entry in
+  `tools` is `search_articles`", not "there is no `tools` field".
 - **No wall-clock leakage in prompts.** Any prompt/context builder that
   touches "today" or "current date" (e.g. a macro agent prompt) must source
   that value from the simulated `as_of_date`, never from `datetime.now()`.

@@ -23,7 +23,7 @@ def embed_articles(session) -> None:
         session.rollback()
         print(f"  embeddings    -> FAILED: {exc}")
         print("                   Re-run with `--datasets articles` to resume.")
-        return
+        raise SystemExit(1) from exc
     for column, count in counts.items():
         print(f"  {column:<24} -> {count} new vectors")
 

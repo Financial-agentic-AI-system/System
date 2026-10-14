@@ -8,7 +8,7 @@ The system utilizes a multi-agent LLM architecture built on LangGraph to simulat
 *   **Portfolio Manager (PM):** The central node of the graph. It asks questions to the specialized agents, gathers their reports, and synthesizes an overall opinion supported by arguments.
 *   **Critic:** Evaluates the Portfolio Manager's synthesized opinion. It acts as a safeguard, ensuring the PM's logic is sound and unbiased.
 *   **Financial Agent:** Analyzes the stock's financial fundamentals and provides reasoning.
-*   **Sentiment Agent:** Evaluates market sentiment and provides an opinion.
+*   **Sentiment Agent:** Evaluates market sentiment and provides an opinion. Starts from the most recent articles and may ask for a semantic search (up to 3 queries per round) when they are not enough; on a re-ask it can search again, guided by the Critic's feedback.
 *   **Macro Agent:** Analyzes the broader macroeconomic context and provides an opinion.
 
 ## The Debate Protocol (Execution Graph)

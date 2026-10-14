@@ -51,10 +51,15 @@ exists only for the Sentiment agent, which needs to find the news articles
 *relevant* to a ticker/question out of free-text `article_summaries` —
 that's the one case where embeddings genuinely earn their complexity.
 
-**Note — retriever query strategy:** the Sentiment agent's semantic search
-runs 3 distinct queries (not one) against the embedded `article_summaries`,
-and aggregates their results into the sentiment context — not yet decided
-which 3 or how the aggregation dedupes/ranks across them.
+**Note — retriever query strategy:** the Sentiment agent starts from the 10
+most recent articles and may ask for a search (`search_articles` tool, up to 3
+queries per round, chosen by the model; `src/agents/tools.py`). The code runs
+the queries against the embedded `article_summaries` with the ticker and
+`as_of_date` taken from the debate state, drops duplicates (an article found
+twice is kept once, with its best similarity) and adds the new ones to the
+sentiment context. The queries and the found articles are written to the
+debate history and shown on the frontend. See `docs/project_decisions.md`
+(2026-10-14) for the reasoning.
 
 ## 2. Components
 
@@ -65,7 +70,7 @@ which 3 or how the aggregation dedupes/ranks across them.
 | Message Broker & Agent Cache | Redis — Celery broker/backend + live debate status/history. Cache only, not persisted — a restarted Redis loses in-progress and past debate transcripts; only the final prediction (Postgres, if/when added) would survive that | `src/cache/` | not started |
 | Celery Worker | Runs the LangGraph debate, the only Celery worker in the system | `src/worker/` | scaffold (`test_task` only) |
 | Agents (graph) | PM, Critic, Financial/Sentiment/Macro agents, debate protocol | `src/agents/` | scaffold (empty) — see `docs/agents.md` for the protocol spec |
-| Retriever | Semantic search over pgvector — Sentiment agent only. `search_articles()` embeds the query and runs the point-in-time similarity query (`fetch_similar_articles` in `src/db/queries.py`). Plain SQLAlchemy + pgvector, no LangChain | `src/retriever/search.py` | search function done, tested (`tests/unit/test_article_search.py`); **not yet used by the Sentiment agent** |
+| Retriever | Semantic search over pgvector — Sentiment agent only. `search_articles()` embeds the query and runs the point-in-time similarity query (`fetch_similar_articles` in `src/db/queries.py`). Plain SQLAlchemy + pgvector, no LangChain | `src/retriever/search.py` | search function done, tested (`tests/unit/test_article_search.py`); used by the Sentiment agent through the `search_articles` tool (`src/agents/nodes.py`) |
 | DB (Postgres/pgvector) | Relational storage + vector store; Financial/Macro agents query it directly via SQL | `src/db/` | **done, tested** (`tests/unit/test_db_loaders.py`) |
 | data_fetcher | Fetches market/fundamental/sentiment data from Alpha Vantage into the datalake — manual/dev-only, never triggered by the backend | `data_scripts/` | done (one-off CLI scripts) |
 | datalake/raw_data | External repo, read-only from this repo's POV | `../datalake/` (sibling repo) | populated for ~9-10 tickers |

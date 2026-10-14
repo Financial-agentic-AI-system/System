@@ -35,6 +35,8 @@ def _base_state(round_number: int = 1, **overrides) -> DebateState:
         "financial_report": None,
         "sentiment_report": None,
         "macro_report": None,
+        "sentiment_queries": [],
+        "sentiment_sources": [],
         "pm_opinion": None,
         "critic_feedback": None,
         "final_result": None,
@@ -176,6 +178,11 @@ def test_financial_agent_node_round2_uses_revision_prompt(monkeypatch):
 def test_sentiment_agent_node_round1_uses_system_prompt(monkeypatch):
     monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
     monkeypatch.setattr(nodes, "fetch_recent_articles", lambda *a, **k: [])
+    monkeypatch.setattr(nodes, "fetch_articles_by_ids", lambda *a, **k: [])
+    # The model declines to search: no queries, so the retriever is never reached.
+    monkeypatch.setattr(
+        llm_client, "generate_tool_calls", lambda prompt, tools: [], raising=False
+    )
 
     render_calls: list[dict] = []
     monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
@@ -190,9 +197,15 @@ def test_sentiment_agent_node_round1_uses_system_prompt(monkeypatch):
 
     result = nodes.sentiment_agent_node(_base_state(round_number=1))
 
-    assert result == {"sentiment_report": fake_report}
-    assert render_calls[0]["name"] == "sentiment_agent"
-    assert render_calls[0]["key"] == "system_prompt"
+    assert result == {
+        "sentiment_report": fake_report,
+        "sentiment_queries": [],
+        "sentiment_sources": [],
+    }
+    # Two prompts per round: the one that lets the model ask for a search, then
+    # the one that produces the opinion.
+    assert [c["name"] for c in render_calls] == ["sentiment_agent"] * 2
+    assert [c["key"] for c in render_calls] == ["search_prompt", "system_prompt"]
 
 
 def test_macro_agent_node_round2_uses_revision_prompt(monkeypatch):
