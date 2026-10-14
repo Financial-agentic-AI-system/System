@@ -2,6 +2,10 @@
 via MaaS. Cutoff (Dec 2023) and no-grounding rationale: docs/evaluation.md
 §§2-3.3. Update that doc's "Model + version" row if this changes.
 
+Two entry points: `generate_structured` (an answer in a Pydantic schema) and
+`generate_tool_calls` (the model may ask for one of *our* local function tools).
+Neither ever attaches a grounding/search tool.
+
 Auth: ADC by default (`gcloud auth application-default login`). Set
 GEMINI_API_KEY to use an API key instead — untested against this specific
 endpoint, treat as a local-testing convenience, not the recommended path.
@@ -16,9 +20,12 @@ Model Garden page once per project, or every call 404s.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import random
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import TypeVar
 
 import google.auth
@@ -26,7 +33,10 @@ import google.auth.transport.requests
 import requests
 from pydantic import BaseModel, ValidationError
 
+logger = logging.getLogger(__name__)
+
 T = TypeVar("T", bound=BaseModel)
+R = TypeVar("R")  # whatever a response parser returns
 
 MODEL_VERSION = os.environ.get("LLM_MODEL_VERSION", "meta/llama-3.3-70b-instruct-maas")
 _PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
@@ -114,35 +124,16 @@ def _retry_delay(exc: Exception, attempt: int) -> float:
     return 2**attempt
 
 
-def generate_structured(prompt: str, schema: type[T], temperature: float = 0.0) -> T:
-    """Call the LLM with `prompt`, parse the response into `schema`.
+def _call(body: dict, parse: Callable[[dict], R], label: str, detail: str = "") -> R:
+    """POST `body`, hand the response JSON to `parse`, and return its result.
 
-    `temperature` defaults to 0 for deterministic, reproducible output —
-    see docs/evaluation.md, backtests need results that don't change between
-    runs of the same `as_of_date`/prompt.
-
-    No `tools` param is ever sent to the API — see the module docstring and
-    docs/evaluation.md §2 for why that matters during backtests.
-
-    Retries up to `_MAX_RETRIES` times, but only for errors worth retrying
-    (see `_should_retry`) — a permanent error like a 404 fails immediately
-    instead of burning through the full backoff schedule first.
+    One retry loop, one budget of `_MAX_RETRIES` attempts, covers both network
+    errors and responses `parse` cannot read (the model may return a broken
+    JSON). Only errors worth retrying are retried (see `_should_retry`) — a
+    permanent error like a 404 fails immediately instead of burning through
+    the full backoff schedule first.
     """
     url = _endpoint_url()
-    body = {
-        "model": MODEL_VERSION,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": temperature,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": schema.__name__,
-                "schema": schema.model_json_schema(),
-                "strict": True,
-            },
-        },
-    }
-
     last_error: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
@@ -153,8 +144,7 @@ def generate_structured(prompt: str, schema: type[T], temperature: float = 0.0) 
                 timeout=_TIMEOUT_S,
             )
             response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"]
-            return schema.model_validate(json.loads(content))
+            return parse(response.json())
         except (
             requests.RequestException,
             KeyError,
@@ -169,6 +159,84 @@ def generate_structured(prompt: str, schema: type[T], temperature: float = 0.0) 
                 time.sleep(_retry_delay(exc, attempt))
 
     raise LLMClientError(
-        f"generate_structured failed after {attempt} attempt(s) for schema "
-        f"'{schema.__name__}': {last_error}"
+        f"{label} failed after {attempt} attempt(s){detail}: {last_error}"
     ) from last_error
+
+
+def generate_structured(prompt: str, schema: type[T], temperature: float = 0.0) -> T:
+    """Call the LLM with `prompt`, parse the response into `schema`.
+
+    `temperature` defaults to 0 for deterministic, reproducible output —
+    see docs/evaluation.md, backtests need results that don't change between
+    runs of the same `as_of_date`/prompt.
+
+    No `tools` param is sent here, and no grounding/search tool is ever
+    attached to any call — see the module docstring and docs/evaluation.md §2
+    for why that matters during backtests.
+    """
+    body = {
+        "model": MODEL_VERSION,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema.__name__,
+                "schema": schema.model_json_schema(),
+                "strict": True,
+            },
+        },
+    }
+
+    def parse(data: dict) -> T:
+        content = data["choices"][0]["message"]["content"]
+        return schema.model_validate(json.loads(content))
+
+    return _call(
+        body, parse, "generate_structured", detail=f" for schema '{schema.__name__}'"
+    )
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """One function call the model asked for: its name and parsed arguments."""
+
+    name: str
+    arguments: dict
+
+
+def _parse_tool_calls(data: dict) -> list[ToolCall]:
+    message = data["choices"][0]["message"]
+    calls: list[ToolCall] = []
+    for raw in message.get("tool_calls") or []:  # key missing or null -> []
+        try:
+            calls.append(
+                ToolCall(
+                    name=raw["function"]["name"],
+                    # `arguments` is a JSON *string*, not a dict
+                    arguments=json.loads(raw["function"]["arguments"]),
+                )
+            )
+        except (KeyError, TypeError, json.JSONDecodeError):
+            logger.warning("Skipping malformed tool call: %r", raw)
+    return calls
+
+
+def generate_tool_calls(
+    prompt: str, tools: list[dict], temperature: float = 0.0
+) -> list[ToolCall]:
+    """One call with `tools`. Returns the calls the model asked for, [] when it
+    answered in plain text.
+
+    The model never executes anything: it only asks. No `response_format` and
+    no `tool_choice` on purpose — calling a tool is optional, and a plain
+    answer is a valid outcome. `tools` must hold only our own local function
+    tools (never a grounding/search tool, docs/evaluation.md §2).
+    """
+    body = {
+        "model": MODEL_VERSION,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "tools": tools,
+    }
+    return _call(body, _parse_tool_calls, "generate_tool_calls")

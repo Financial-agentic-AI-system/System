@@ -2,25 +2,41 @@
 final-result assembly node. The SQL they read lives in `src/db/queries.py`.
 """
 
+import logging
+import os
+
 from src.agents import llm_client
 from src.agents.prompt_loader import render_prompt
 from src.agents.state import (
     AgentReport,
     AgentReports,
+    ArticleSource,
     CriticFeedback,
     DebateState,
     NextAgentsSelection,
     PMOpinion,
     PredictResult,
 )
+from src.agents.tools import SEARCH_ARTICLES_TOOL, extract_queries
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
 from src.db.queries import (
+    count_articles_without_embedding,
+    fetch_articles_by_ids,
     fetch_fundamentals,
     fetch_macro_series,
     fetch_prices,
     fetch_recent_articles,
 )
 from src.db.session import get_session
+
+# Aliased: the model sees the *tool* as `search_articles`; this is the retriever.
+from src.retriever.search import search_articles as retrieve_articles
+
+logger = logging.getLogger(__name__)
+
+# Articles kept per query. The retriever's similarity threshold often returns
+# fewer, or none — see docs/project_decisions.md.
+SEARCH_LIMIT = 5
 
 
 # --------------------------------------------------------------------------- #
@@ -77,6 +93,35 @@ def format_sentiment_context(rows: list[ArticleSummary]) -> str:
     )
 
 
+def render_extra_section(rows: list[ArticleSummary]) -> str:
+    """The "additional articles" block of a sentiment prompt, or an empty
+    string when the search found nothing (the section is simply left out).
+    """
+    if not rows:
+        return ""
+    return render_prompt(
+        "sentiment_agent",
+        key="extra_articles_section",
+        extra_articles=format_sentiment_context(rows),
+    )
+
+
+def build_source(
+    article: ArticleSummary, similarity: float, query: str
+) -> ArticleSource:
+    """What the frontend shows about one article the search found."""
+    published = article.time_published
+    return ArticleSource(
+        id=article.id,
+        title=article.title,
+        url=article.url,
+        source=article.source,
+        published=published.isoformat() if published else None,
+        similarity=round(similarity, 3),
+        query=query,
+    )
+
+
 def format_report(report: AgentReport | None) -> str:
     if report is None:
         return "(no report yet)"
@@ -125,31 +170,126 @@ def financial_agent_node(state: DebateState) -> dict:
     return {"financial_report": report}
 
 
+def retrieval_enabled() -> bool:
+    return os.environ.get("SENTIMENT_RETRIEVAL", "1") != "0"
+
+
 def sentiment_agent_node(state: DebateState) -> dict:
+    """Assess sentiment from the most recent articles, optionally widened by a
+    semantic search the model asks for.
+
+    Per round: (1) read the recent articles plus those found in earlier rounds;
+    (2) ask the model whether it wants to search — it may call the
+    `search_articles` tool with up to MAX_QUERIES queries, or decline; (3) run
+    the queries against pgvector, with `ticker` and `as_of_date` taken from the
+    state, never from the model; (4) have the model write its opinion.
+
+    Returns only this round's queries and sources — the state's reducers
+    accumulate them (see `DebateState`).
+    """
+    ticker, as_of = state["ticker"], state["as_of_date"]
+    first_round = state["round_number"] == 1
+    search_key, final_key = (
+        ("search_prompt", "system_prompt")
+        if first_round
+        else ("revision_search_prompt", "revision_prompt")
+    )
+    prior_ids = [source["id"] for source in state["sentiment_sources"]]
+
+    # Short DB session: the LLM calls below can take a while.
     with get_session() as session:
-        articles = fetch_recent_articles(session, state["ticker"], state["as_of_date"])
+        recent = fetch_recent_articles(session, ticker, as_of)
+        recent_ids = {article.id for article in recent}
+        earlier = [
+            article
+            for article in fetch_articles_by_ids(session, ticker, as_of, prior_ids)
+            if article.id not in recent_ids
+        ]
 
     common = dict(
-        ticker=state["ticker"],
-        as_of_date=state["as_of_date"],
+        ticker=ticker,
+        as_of_date=as_of,
         horizon=state["horizon"],
-        sentiment_context=format_sentiment_context(articles),
+        sentiment_context=format_sentiment_context(recent),
     )
-
-    if state["round_number"] == 1:
-        prompt = render_prompt("sentiment_agent", **common)
-    else:
-        prompt = render_prompt(
-            "sentiment_agent",
-            key="revision_prompt",
+    if not first_round:
+        common.update(
             round_number=state["round_number"],
             critic_feedback=state["critic_feedback"].feedback,
             previous_opinion=format_report(state["sentiment_report"]),
-            **common,
+            previous_queries="; ".join(state["sentiment_queries"]) or "(none)",
         )
 
-    report = llm_client.generate_structured(prompt, AgentReport)
-    return {"sentiment_report": report}
+    # Step 2: the model decides whether the recent articles are enough.
+    queries: list[str] = []
+    if retrieval_enabled():
+        search_prompt = render_prompt(
+            "sentiment_agent",
+            key=search_key,
+            extra_section=render_extra_section(earlier),
+            **common,
+        )
+        queries = extract_queries(
+            llm_client.generate_tool_calls(search_prompt, [SEARCH_ARTICLES_TOOL])
+        )
+
+    # Step 3: retrieval. An article found by several queries is kept once,
+    # with its best similarity. Infrastructure errors (embedding API, SQL)
+    # propagate on purpose: a debate that silently skipped retrieval would
+    # look valid but not be comparable in a backtest.
+    new: list[ArticleSummary] = []
+    sources: list[ArticleSource] = []
+    if queries:
+        seen = recent_ids | {article.id for article in earlier}
+        best: dict[int, tuple[ArticleSummary, float, str]] = {}
+        with get_session() as session:
+            missing = count_articles_without_embedding(session, ticker, as_of)
+            if missing:
+                logger.warning(
+                    "%s: %d article(s) have no embedding yet; the search covers "
+                    "a partial corpus (run `python -m src.db.load`)",
+                    ticker,
+                    missing,
+                )
+            for query in queries:
+                hits = retrieve_articles(
+                    session,
+                    ticker=ticker,
+                    as_of_date=as_of,
+                    query=query,
+                    limit=SEARCH_LIMIT,
+                )
+                logger.info(
+                    "sentiment search %r -> %d hit(s), best similarity %.2f",
+                    query,
+                    len(hits),
+                    hits[0][1] if hits else 0.0,
+                )
+                for article, similarity in hits:
+                    if article.id in seen:
+                        continue
+                    if article.id not in best or similarity > best[article.id][1]:
+                        best[article.id] = (article, similarity, query)
+        new = [article for article, _, _ in best.values()]
+        sources = [
+            build_source(article, similarity, query)
+            for article, similarity, query in best.values()
+        ]
+
+    # Step 4: the opinion, written against everything the agent has seen.
+    final_prompt = render_prompt(
+        "sentiment_agent",
+        key=final_key,
+        extra_section=render_extra_section(earlier + new),
+        **common,
+    )
+    report = llm_client.generate_structured(final_prompt, AgentReport)
+
+    return {
+        "sentiment_report": report,
+        "sentiment_queries": queries,
+        "sentiment_sources": sources,
+    }
 
 
 def macro_agent_node(state: DebateState) -> dict:

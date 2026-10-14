@@ -39,6 +39,11 @@ def _no_real_db(monkeypatch):
     monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: [])
     monkeypatch.setattr(nodes, "fetch_macro_series", lambda *a, **k: [])
     monkeypatch.setattr(nodes, "fetch_recent_articles", lambda *a, **k: [])
+    monkeypatch.setattr(nodes, "fetch_articles_by_ids", lambda *a, **k: [])
+    # The Sentiment agent asks the model whether to search; "no search needed".
+    monkeypatch.setattr(
+        llm_client, "generate_tool_calls", lambda prompt, tools: [], raising=False
+    )
 
 
 @pytest.fixture(autouse=True)
