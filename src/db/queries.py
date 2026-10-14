@@ -8,10 +8,12 @@ see `docs/project_decisions.md` for the inclusive-cutoff convention and
 Callers pass an explicit `Session`; nothing here opens or commits one.
 """
 
+from collections.abc import Sequence
 from datetime import date, timedelta
+from typing import Literal
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
 
@@ -81,6 +83,13 @@ def fetch_macro_series(
     return list(session.scalars(stmt))
 
 
+# The 768-float vectors are never needed by callers; no need to load them into memory.
+_WITHOUT_EMBEDDINGS = (
+    defer(ArticleSummary.summary_embedding),
+    defer(ArticleSummary.title_summary_embedding),
+)
+
+
 def fetch_recent_articles(
     session: Session, ticker: str, as_of_date: date, limit: int = 10
 ) -> list[ArticleSummary]:
@@ -91,6 +100,7 @@ def fetch_recent_articles(
     """
     stmt = (
         select(ArticleSummary)
+        .options(*_WITHOUT_EMBEDDINGS)
         .where(
             ArticleSummary.symbol == ticker,
             ArticleSummary.time_published < as_of_date + timedelta(days=1),
@@ -101,6 +111,46 @@ def fetch_recent_articles(
     return list(session.scalars(stmt))
 
 
+EmbeddingVariant = Literal["summary", "title_summary"]
+
+# Calibration: docs/project_decisions.md.
+DEFAULT_MIN_SIMILARITY = 0.5
+DEFAULT_VARIANT: EmbeddingVariant = "title_summary"
+
+
+def fetch_similar_articles(
+    session: Session,
+    ticker: str,
+    as_of_date: date,
+    query_embedding: Sequence[float],
+    limit: int = 10,
+    variant: EmbeddingVariant = DEFAULT_VARIANT,
+    min_similarity: float | None = DEFAULT_MIN_SIMILARITY,
+) -> list[tuple[ArticleSummary, float]]:
+    """Up to `limit` (article, cosine similarity) pairs, most similar first,
+    published on or before `as_of_date`. `variant` picks the embedding column;
+    articles without it, or below `min_similarity`, are skipped.
+    """
+    column = (
+        ArticleSummary.summary_embedding
+        if variant == "summary"
+        else ArticleSummary.title_summary_embedding
+    )
+    distance = column.cosine_distance(list(query_embedding))
+    stmt = (
+        select(ArticleSummary, (1 - distance).label("similarity"))
+        .options(*_WITHOUT_EMBEDDINGS)
+        .where(
+            ArticleSummary.symbol == ticker,
+            ArticleSummary.time_published < as_of_date + timedelta(days=1),
+            column.is_not(None),
+        )
+        .order_by(distance)
+        .limit(limit)
+    )
+    if min_similarity is not None:
+        stmt = stmt.where(distance <= 1 - min_similarity)
+    return [(article, float(sim)) for article, sim in session.execute(stmt)]
 def fetch_tickers(session: Session) -> list[str]:
     """Tickers that have price data, sorted."""
     stmt = select(StockPrice.symbol).distinct().order_by(StockPrice.symbol)
