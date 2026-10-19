@@ -6,8 +6,9 @@ type level — all three write an `AgentReport` to a different key of
 they fetch) and `prompts/*.yaml` (what they're asked), not here.
 """
 
+import operator
 from datetime import date
-from typing import Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -54,6 +55,18 @@ class PredictResult(BaseModel):
     agent_reports: AgentReports
 
 
+class ArticleSource(TypedDict):
+    """One article the sentiment agent found by searching; shown on the frontend."""
+
+    id: int
+    title: str | None
+    url: str
+    source: str | None
+    published: str | None  # ISO timestamp
+    similarity: float
+    query: str  # the query that found it
+
+
 class DebateState(TypedDict):
     ticker: str
     horizon: str
@@ -65,6 +78,9 @@ class DebateState(TypedDict):
     financial_report: AgentReport | None
     sentiment_report: AgentReport | None
     macro_report: AgentReport | None
+
+    sentiment_queries: Annotated[list[str], operator.add]
+    sentiment_sources: Annotated[list[ArticleSource], operator.add]
 
     pm_opinion: PMOpinion | None
     critic_feedback: CriticFeedback | None

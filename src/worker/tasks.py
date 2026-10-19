@@ -36,6 +36,8 @@ def _run_debate(
         "financial_report": None,
         "sentiment_report": None,
         "macro_report": None,
+        "sentiment_queries": [],
+        "sentiment_sources": [],
         "pm_opinion": None,
         "critic_feedback": None,
         "final_result": None,
