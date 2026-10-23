@@ -14,6 +14,17 @@ initial_prompt: |
   Macro Agent:
   {macro_report}
 
+  Meaning of the labels (use exactly this definition). Over the horizon of
+  {horizon_long}, one standard deviation of this stock's price move is
+  {band_pct} (exponentially weighted volatility of daily returns, span
+  {vol_span} sessions, scaled to the horizon):
+  - BUY: you expect the price to rise by more than {band_pct} at some point
+    within the horizon.
+  - SELL: you expect the price to fall by more than {band_pct} at some point
+    within the horizon.
+  - HOLD: you expect the price to stay within +/-{band_pct} of today's price
+    for the whole horizon.
+
   Synthesize a single investment opinion. Your direction must be exactly one
   of BUY, HOLD, or SELL. Give a confidence between 0.0 and 1.0, a concise
   summary of your reasoning, and the list of arguments (grounded in the
@@ -66,6 +77,17 @@ revision_prompt: |
 
   Macro Agent:
   {macro_report}
+
+  Meaning of the labels (use exactly this definition). Over the horizon of
+  {horizon_long}, one standard deviation of this stock's price move is
+  {band_pct} (exponentially weighted volatility of daily returns, span
+  {vol_span} sessions, scaled to the horizon):
+  - BUY: you expect the price to rise by more than {band_pct} at some point
+    within the horizon.
+  - SELL: you expect the price to fall by more than {band_pct} at some point
+    within the horizon.
+  - HOLD: you expect the price to stay within +/-{band_pct} of today's price
+    for the whole horizon.
 
   Revise your opinion in light of the Critic's feedback and the (possibly
   updated) reports above. Your direction must still be exactly one of BUY,
