@@ -96,7 +96,7 @@ The system includes a generic CLI tool for fetching data from Alpha Vantage.
 Basic usage:
 
 ```bash
-python data_scripts/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <TICKERS> --period <PERIOD>
+python scripts/data/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <TICKERS> --period <PERIOD>
 ```
 #### Loading data into db
 

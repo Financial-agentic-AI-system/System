@@ -20,7 +20,7 @@ Date range and relevance filter:
   * additionally drops articles with relevance_score < --min-relevance (default 0.9).
 
 Examples:
-    python fetch_article_summaries.py                          # 9 tickers, 2025-01..2026-06
+    python fetch_article_summaries.py                     # 9 tickers, 2025-01..2026-06
     python fetch_article_summaries.py -t AAPL,NVDA
     python fetch_article_summaries.py --start 2025-01 --end 2026-06 --chunk-months 3
 """
@@ -115,7 +115,7 @@ def fetch_news_feed(
     end_month: int,
     chunk_months: int,
 ) -> list:
-    """Fetches the NEWS_SENTIMENT feed for the whole range, by windows, deduped by URL."""
+    """Fetches the NEWS_SENTIMENT feed for the range in windows, deduped by URL."""
     feed, seen = [], set()
     for time_from, time_to in date_windows(
         start_year, start_month, end_year, end_month, chunk_months
