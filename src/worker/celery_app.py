@@ -1,3 +1,4 @@
+import logging
 import os
 
 from celery import Celery
@@ -11,6 +12,10 @@ app = Celery(
     backend=REDIS_URL,
     include=["src.worker.tasks"],
 )
+
+# Our own loggers (src.*): INFO shows one line per LLM call and a summary per
+# debate; DEBUG adds the full prompts and responses.
+logging.getLogger("src").setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
 app.conf.update(
     task_serializer="json",
