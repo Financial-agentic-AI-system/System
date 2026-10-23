@@ -9,6 +9,9 @@ prompt key it picks, what it passes, and which state key it returns.
 """
 
 from datetime import date
+from types import SimpleNamespace
+
+import pytest
 
 from src.agents import llm_client, nodes
 from src.agents.state import (
@@ -239,7 +242,14 @@ def test_macro_agent_node_round2_uses_revision_prompt(monkeypatch):
 # --------------------------------------------------------------------------- #
 # PM / Critic nodes — no DB at all, only LLM call
 # --------------------------------------------------------------------------- #
+def _patch_pm_prices(monkeypatch, closes_desc=()):
+    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
+    rows = [SimpleNamespace(close=c) for c in closes_desc]
+    monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: rows)
+
+
 def test_pm_synthesize_node_first_round_uses_initial_prompt(monkeypatch):
+    _patch_pm_prices(monkeypatch)
     render_calls: list[dict] = []
     monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
     fake_opinion = PMOpinion(
@@ -260,6 +270,7 @@ def test_pm_synthesize_node_first_round_uses_initial_prompt(monkeypatch):
 
 
 def test_pm_synthesize_node_later_round_uses_revision_prompt(monkeypatch):
+    _patch_pm_prices(monkeypatch)
     render_calls: list[dict] = []
     monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
     fake_opinion = PMOpinion(
@@ -365,3 +376,45 @@ def test_finalize_node_assembles_predict_result():
     assert final.agent_reports.financial.opinion == "f-op"
     assert final.agent_reports.sentiment.opinion == "s-op"
     assert final.agent_reports.macro.opinion == "m-op"
+
+
+def test_pm_prompt_gets_hold_band_from_volatility(monkeypatch):
+    # alternating +1% / -1% closes (newest first) -> non-zero daily sigma
+    closes = [100.0 * (1.01 if i % 2 else 1.0) for i in range(30)]
+    _patch_pm_prices(monkeypatch, closes)
+    render_calls: list[dict] = []
+    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
+    monkeypatch.setattr(
+        llm_client,
+        "generate_structured",
+        lambda prompt, model: PMOpinion(
+            direction="HOLD", confidence=0.5, summary="s", arguments=["a"]
+        ),
+        raising=False,
+    )
+
+    nodes.pm_synthesize_node(_base_state(round_number=1))
+
+    kwargs = render_calls[0]["kwargs"]
+    assert kwargs["horizon_long"].startswith("1 week")
+    assert kwargs["band_pct"].endswith("%")
+    assert kwargs["vol_span"] == 100
+
+
+def test_horizon_sigma_scales_with_sqrt_of_sessions():
+    from src.agents.volatility import horizon_sigma
+
+    closes = [100.0 * (1.01 if i % 2 else 1.0) for i in range(30)]
+    one_week = horizon_sigma(closes, "1W")
+    one_month = horizon_sigma(closes, "1M")
+    assert one_month / one_week == pytest.approx((21 / 5) ** 0.5)
+    assert horizon_sigma([100.0], "1W") is None
+
+
+def test_ewm_std_matches_pandas():
+    pd = pytest.importorskip("pandas")
+    from src.agents.volatility import ewm_std
+
+    returns_desc = [0.01, -0.02, 0.015, 0.003, -0.007, 0.02, -0.011] * 20
+    expected = pd.Series(returns_desc[::-1]).ewm(span=100).std().iloc[-1]
+    assert ewm_std(returns_desc, 100) == pytest.approx(expected)

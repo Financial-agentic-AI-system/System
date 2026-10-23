@@ -93,6 +93,9 @@ services:
     volumes:
       - ../datalake:/datalake:ro
       - ./.env:/app/.env
+      - ./scripts:/app/scripts
+      - ./results:/app/results
+      - ${APPDATA}/gcloud:/root/.config/gcloud:ro
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/mas_db
       - REDIS_URL=redis://redis:6379/0
