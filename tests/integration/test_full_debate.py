@@ -12,7 +12,7 @@ test_agent_db_integration.py (one node, one call), this can trigger many
 LLM calls in a single run — 3 agents + PM + Critic per round, up to 3
 rounds if the Critic keeps disagreeing. Worst case is roughly 3 + 1 + 1
 (round 1) + up to 3 + 1 + 1 per re-ask round x2 more rounds. Cheap per
-call (Llama 3.3 MaaS pricing, see docs/project_decisions.md) but not
+call (Llama 4 Scout MaaS pricing, see docs/project_decisions.md) but not
 "one call" cheap — don't loop this in a shell script without thinking
 about it.
 

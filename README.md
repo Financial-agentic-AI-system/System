@@ -32,7 +32,7 @@ Thesis/
 ### Using Docker (Recommended)
 To run the full stack (Redis, Postgres/pgvector, backend, worker, frontend), use:
 
-```bash
+```bash  
 docker compose up --build
 ```
 
