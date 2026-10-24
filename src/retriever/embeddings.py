@@ -57,7 +57,7 @@ def _endpoint_url() -> str:
             "GCP_PROJECT_ID is not set. Required to call the embedding model — "
             "see .env.example."
         )
-    location = os.environ.get("GCP_LOCATION", "us-central1")
+    location = os.environ.get("GCP_LOCATION")
     return (
         f"https://{location}-aiplatform.googleapis.com/v1/projects/{project}"
         f"/locations/{location}/publishers/google/models/{model_name()}:predict"

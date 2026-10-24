@@ -5,6 +5,8 @@ past a few entries.
 
 ## 2026-08-15 — LLM: Llama 3.3 70B Instruct (MaaS) instead of Gemini
 
+Superseded on 2026-10-23 by Llama 4 Scout, see below.
+
 Chosen over any Gemini model for two reasons:
 
 1. **Training cutoff.** Backtest window starts 2025-01-01 (`docs/evaluation.md`
@@ -71,3 +73,21 @@ published after `as_of_date` is visible.
 - **Ablation switch.** `SENTIMENT_RETRIEVAL=0` leaves out the search entirely
   (docs/evaluation.md §4). At most 3 queries per round, 5 articles per query,
   on top of the retriever's 0.5 similarity threshold.
+
+## 2026-10-23 — LLM: Llama 4 Scout instead of Llama 3.3
+
+Llama 3.3 70B MaaS stopped being available to our project: every call
+returned 404 "Publisher model ... was not found or your project does not have
+access to it". Replaced by Llama 4 Scout 17B-16E Instruct (`meta/llama-4-scout-17b-16e-instruct-maas`) on the
+same platform and auth. Scout is served in `us-east5`, so `GCP_LOCATION` and
+the backtest proxy allowlist moved there from `us-central1`.
+
+- **Training cutoff** is August 2024 (Meta's model card): still before the
+  2025-01-01 backtest window, with a smaller margin than Llama 3.3's
+  December 2023.
+- **Not comparable across the switch.** Debates and backtests run with Llama
+  3.3 and with Scout come from different models; `model_version` in each
+  prediction tells them apart.
+- **Structured output quirk.** Scout sometimes returns a structured answer
+  wrapped as a function call (`{"type": "function", "parameters": {...}}`);
+  `generate_structured` unwraps it.

@@ -105,7 +105,7 @@ doesn't weaken the isolation.
 
 Allowlist in `docker/backtest-proxy/squid.conf` is as narrow as the
 LLM/embedding calls actually require — currently
-`us-central1-aiplatform.googleapis.com` (the inference calls themselves)
+`us-east5-aiplatform.googleapis.com` (the inference calls themselves)
 and `oauth2.googleapis.com` (ADC token refresh talks to a *different* host
 than the inference endpoint — easy to miss, discovered by allowing all +
 reading squid's `access.log` during one real call, then locking down).
@@ -125,8 +125,8 @@ backtest-worker ...`.
 | Field | Value |
 | --- | --- |
 | Backtest window | 2025-01-01 → mid-2026 |
-| Model + version | Llama 3.3 70B Instruct — `meta/llama-3.3-70b-instruct-maas`, served as MaaS on Gemini Enterprise Agent Platform (`src/agents/llm_client.py`) |
-| Required model training cutoff | before 2025-01-01 — satisfied: Meta's official Llama 3.3 model card lists a training data cutoff of **December 2023** |
+| Model + version | Llama 4 Scout 17B-16E Instruct — `meta/llama-4-scout-17b-16e-instruct-maas`, served as MaaS on Gemini Enterprise Agent Platform (`src/agents/llm_client.py`) |
+| Required model training cutoff | before 2025-01-01 — satisfied: Meta's official Llama 4 Scout model card lists a training data cutoff of **August 2024** |
 
 Record this triple together per backtest run, not independently — it's
 already captured per-prediction in the `model_version` / `as_of_date` fields

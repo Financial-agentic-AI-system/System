@@ -1,5 +1,5 @@
-"""LLM client for Gemini Enterprise Agent Platform — Llama 3.3 70B Instruct
-via MaaS. Cutoff (Dec 2023) and no-grounding rationale: docs/evaluation.md
+"""LLM client for Gemini Enterprise Agent Platform — Llama 4 Scout 17B-16E
+Instruct via MaaS. Cutoff (Aug 2024) and no-grounding rationale: docs/evaluation.md
 §§2-3.3. Update that doc's "Model + version" row if this changes.
 
 Two entry points: `generate_structured` (an answer in a Pydantic schema) and
@@ -11,7 +11,7 @@ GEMINI_API_KEY to use an API key instead — untested against this specific
 endpoint, treat as a local-testing convenience, not the recommended path.
 
 Env vars (see .env.example): GCP_PROJECT_ID (required), GCP_LOCATION
-(default us-central1), LLM_MODEL_VERSION, GEMINI_API_KEY (optional).
+(default us-east5), LLM_MODEL_VERSION, GEMINI_API_KEY (optional).
 
 Requires accepting the Llama Community License Agreement on the model's
 Model Garden page once per project, or every call 404s.
@@ -38,9 +38,11 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R")  # whatever a response parser returns
 
-MODEL_VERSION = os.environ.get("LLM_MODEL_VERSION", "meta/llama-3.3-70b-instruct-maas")
+MODEL_VERSION = os.environ.get(
+    "LLM_MODEL_VERSION", "meta/llama-4-scout-17b-16e-instruct-maas"
+)
 _PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-_LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
+_LOCATION = os.environ.get("GCP_LOCATION", "us-east5")
 _API_KEY = os.environ.get("GEMINI_API_KEY")
 
 _MAX_RETRIES = 5
@@ -163,6 +165,19 @@ def _call(body: dict, parse: Callable[[dict], R], label: str, detail: str = "") 
     ) from last_error
 
 
+def _unwrap_function_call(answer: object) -> object:
+    """Llama 4 sometimes wraps a structured answer as a function call:
+    `{"type": "function", "name": ..., "parameters": {...}}`. Return the inner
+    object in that case, the answer unchanged otherwise.
+    """
+    if not isinstance(answer, dict) or answer.get("type") != "function":
+        return answer
+    inner = answer.get("parameters", answer.get("arguments"))
+    if isinstance(inner, str):
+        inner = json.loads(inner)
+    return inner if isinstance(inner, dict) else answer
+
+
 def generate_structured(prompt: str, schema: type[T], temperature: float = 0.0) -> T:
     """Call the LLM with `prompt`, parse the response into `schema`.
 
@@ -190,7 +205,7 @@ def generate_structured(prompt: str, schema: type[T], temperature: float = 0.0) 
 
     def parse(data: dict) -> T:
         content = data["choices"][0]["message"]["content"]
-        return schema.model_validate(json.loads(content))
+        return schema.model_validate(_unwrap_function_call(json.loads(content)))
 
     return _call(
         body, parse, "generate_structured", detail=f" for schema '{schema.__name__}'"
