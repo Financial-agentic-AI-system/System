@@ -3,7 +3,13 @@
 import config
 import streamlit as st
 from api_client import get_client
-from components import find_run, page_footer, render_rounds, render_transcript
+from components import (
+    find_run,
+    live_status_bar,
+    page_footer,
+    render_rounds,
+    render_transcript,
+)
 from debate_model import build_rounds, describe_progress, is_terminal
 from models import ApiError
 
@@ -49,13 +55,7 @@ def _render_state() -> bool:
     if status.status == "FAILED":
         st.error(message)
     elif live:
-        st.info(f"{message}", icon=":material/hourglass_top:")
-    if status.max_rounds:
-        current = min(status.round_number, status.max_rounds)
-        st.progress(
-            current / status.max_rounds,
-            text=f"Round {current} of {status.max_rounds} (max)",
-        )
+        live_status_bar(message, status.round_number, status.max_rounds)
     render_rounds(rounds, live)
 
     st.subheader("Transcript")

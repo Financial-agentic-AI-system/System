@@ -1,5 +1,6 @@
 """Reusable Streamlit building blocks shared by the pages."""
 
+import html
 from datetime import datetime, timezone, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -43,6 +44,34 @@ CSS = """
 .mas-pill.kept { opacity: .6; border-style: dashed; }
 .mas-arrow { opacity: .45; margin-right: .3rem; }
 @keyframes mas-pulse { 50% { opacity: .55; } }
+/* The bar's element container sticks under Streamlit's header while the
+   transcript below it scrolls. */
+div[data-testid="stElementContainer"]:has(.mas-live-bar) {
+  position: sticky; top: 3.75rem; z-index: 999;
+}
+.mas-live-bar {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem 1rem; border-radius: .6rem; font-size: .95rem;
+  border: 1px solid rgba(59,130,246,.55);
+  background: rgb(232,240,254); box-shadow: 0 2px 10px rgba(0,0,0,.12);
+}
+@media (prefers-color-scheme: dark) {
+  .mas-live-bar { background: rgb(22,33,56); }
+}
+.mas-live-bar .mas-hourglass {
+  display: inline-block; font-size: 1.15rem;
+  animation: mas-flip 2s ease-in-out infinite;
+}
+.mas-live-bar .mas-track {
+  flex: 0 0 6rem; height: .35rem; margin-left: auto;
+  border-radius: 999px; background: rgba(128,128,128,.25); overflow: hidden;
+}
+.mas-live-bar .mas-fill { height: 100%; background: rgb(59,130,246); }
+@keyframes mas-flip {
+  0%, 40% { transform: rotate(0); }
+  50%, 90% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>
 """
 
@@ -201,6 +230,23 @@ def render_transcript(history: list[HistoryEntry]) -> None:
             with st.chat_message("assistant", avatar=AVATARS["pm"]):
                 st.markdown(f"**Portfolio Manager** · {stamp}")
                 st.markdown(f"Re-asking: **{names}**.")
+
+
+def live_status_bar(message: str, round_number: int, max_rounds: int | None) -> None:
+    """Status bar that stays at the top while the debate is scrolled."""
+    label = f"Round {round_number}" + (f" of {max_rounds}" if max_rounds else "")
+    track = ""
+    if max_rounds:
+        width = min(round_number, max_rounds) / max_rounds * 100
+        track = (
+            f'<span class="mas-track"><span class="mas-fill" '
+            f'style="width:{width:.0f}%;display:block"></span></span>'
+        )
+    st.markdown(
+        '<div class="mas-live-bar"><span class="mas-hourglass">⏳</span>'
+        f"<span><b>{label}</b> · {html.escape(message)}</span>{track}</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def find_run(task_id: str) -> dict | None:
