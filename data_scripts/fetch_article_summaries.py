@@ -39,7 +39,7 @@ load_dotenv()
 
 AV_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA"
+DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA,PLTR"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
 
 AV_BASE = "https://www.alphavantage.co/query"
@@ -225,7 +225,7 @@ def parse_ym(s: str):
 )
 @click.option("--start", default="2025-01", help="Range start in YYYY-MM format")
 @click.option(
-    "--end", default="2026-06", help="Range end in YYYY-MM format (inclusive)"
+    "--end", default="2026-09", help="Range end in YYYY-MM format (inclusive)"
 )
 @click.option(
     "--min-relevance",

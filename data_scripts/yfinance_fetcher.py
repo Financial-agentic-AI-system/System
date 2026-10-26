@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 import yfinance as yf
 
-DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA"
+DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA,PLTR"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
 
 
@@ -76,15 +76,15 @@ def save_to_csv(data, output_file: str):
     "--start",
     "-s",
     type=click.DateTime(formats=["%Y-%m-%d"]),
-    default="2024-01-01",
+    default="2010-01-01",
     help="Start date (YYYY-MM-DD)",
 )
 @click.option(
     "--end",
     "-e",
     type=click.DateTime(formats=["%Y-%m-%d"]),
-    default=datetime.date.today().strftime("%Y-%m-%d"),
-    help="End date (YYYY-MM-DD)",
+    default="2026-10-01",
+    help="End date (YYYY-MM-DD, exclusive)",
 )
 @click.option(
     "--interval",
@@ -96,7 +96,7 @@ def save_to_csv(data, output_file: str):
     help="Data interval (1d for daily, 1h for hourly, etc.)",
 )
 @click.option(
-    "--output", "-o", default="stock_prices.csv", help="Output CSV filename in datalake"
+    "--output", "-o", default="stock_prices_daily_from_2010.csv", help="Output CSV filename in datalake"
 )
 def main(
     tickers: str,
@@ -129,7 +129,7 @@ def main(
 
     data = fetch_stock_data(ticker_list, start, end, interval)
 
-    if not data.empty:
+    if len(data):
         save_to_csv(data, output)
 
         click.secho("\n✓ Data fetched successfully!", fg="green", bold=True)

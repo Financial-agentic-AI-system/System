@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA"
+DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA,PLTR"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
 
 
@@ -25,30 +25,50 @@ def fetch_data(ticker: str, function_name: str) -> dict | None:
     return None
 
 
-def save_to_json(data: dict, ticker: str, function_name: str, period: str = "all"):
-    """
-    Saves data. If fundamental data, allows filtering by annual/quarterly.
-    """
+def fetch_reported_dates(ticker: str) -> dict[str, str]:
+    """fiscalDateEnding -> reportedDate (publication date) from EARNINGS."""
+    data = fetch_data(ticker, "EARNINGS") or {}
+    time.sleep(15)
+    return {
+        e["fiscalDateEnding"]: e["reportedDate"]
+        for e in data.get("quarterlyEarnings", [])
+        if e.get("fiscalDateEnding") and e.get("reportedDate")
+    }
+
+
+def _write(data, file_path: Path):
+    with file_path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+    click.secho(f"  -> Saved: {file_path.resolve()}", fg="green")
+
+
+def save_to_json(
+    data: dict,
+    ticker: str,
+    function_name: str,
+    period: str = "all",
+    reported_dates: dict[str, str] | None = None,
+):
+    """Saves {TICKER}_{annual|quarterly}.json (both for "all") with reportedDate added."""
     period_map = {"annual": "annualReports", "quarterly": "quarterlyReports"}
 
     dir_path = OUTPUT_BASE_DIR / function_name
     dir_path.mkdir(parents=True, exist_ok=True)
 
-    if period in period_map and period_map[period] in data:
-        data_to_save = {
-            "symbol": data.get("symbol", ticker),
-            "period": period,
-            "reports": data[period_map[period]],
-        }
-        file_path = dir_path / f"{ticker}_{period}.json"
-    else:
-        data_to_save = data
-        file_path = dir_path / f"{ticker}.json"
+    periods = list(period_map) if period == "all" else [period]
+    periods = [p for p in periods if period_map[p] in data]
+    if not periods:
+        _write(data, dir_path / f"{ticker}.json")
+        return
 
-    with file_path.open("w", encoding="utf-8") as f:
-        json.dump(data_to_save, f, indent=4)
-
-    click.secho(f"  -> Saved: {file_path.resolve()}", fg="green")
+    for p in periods:
+        reports = data[period_map[p]]
+        for r in reports:
+            r["reportedDate"] = (reported_dates or {}).get(r.get("fiscalDateEnding"))
+        _write(
+            {"symbol": data.get("symbol", ticker), "period": p, "reports": reports},
+            dir_path / f"{ticker}_{p}.json",
+        )
 
 
 @click.command()
@@ -72,11 +92,12 @@ def main(functions: str, tickers: str, period: str):
 
     for ticker in ticker_list:
         click.secho(f"--- Stock: {ticker} ---", fg="cyan", bold=True)
+        reported_dates = fetch_reported_dates(ticker)
         for func in func_list:
             data = fetch_data(ticker, func)
 
             if data and "Information" not in data and "Note" not in data:
-                save_to_json(data, ticker, func, period)
+                save_to_json(data, ticker, func, period, reported_dates)
             elif data:
                 error_msg = data.get("Information", data.get("Note", "API error"))
                 click.secho(f"  -> WARNING: {error_msg}", fg="red")
