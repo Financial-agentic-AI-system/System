@@ -10,8 +10,8 @@ dependencies = [
     "redis",
     "langgraph",
     "langchain",
-    "langchain-google-genai",    # Dla Gemini
-    "langchain-google-vertexai", # Dla Vertex AI embeddings
+    "langchain-google-genai",    # For Gemini
+    "langchain-google-vertexai", # For Vertex AI embeddings
     "sqlalchemy",
     "psycopg2-binary",
     "pgvector",
@@ -33,7 +33,7 @@ dev = [
     "ruff"
 ]
 
-# Konfiguracja środowiska narzędzia uv
+# uv tool environment configuration
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
@@ -53,13 +53,13 @@ frontend = [
 [tool.uv]
 default-groups = ["dev", "frontend"]
 
-# Konfiguracja testów jednostkowych
+# Unit test configuration
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]
 pythonpath = ["."]
 addopts = "-v"
 
-# Konfiguracja lintera i formatera Ruff
+# Ruff linter and formatter configuration
 [tool.ruff]
 line-length = 88
 target-version = "py312"
@@ -72,8 +72,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# E: pycodestyle, F: Pyflakes, I: isort (do sortowania importów)
-select = ["E", "F", "I"]
+# E: pycodestyle, F: Pyflakes, I: isort (to sort imports)
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
