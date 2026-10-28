@@ -71,6 +71,18 @@ docker compose up --build postgres redis backend worker
 uv run streamlit run frontend/app.py
 ```
 
+### Debate logs
+
+The worker logs one line per LLM call (node, tokens, cost, time) and a summary
+per debate (decision, rounds, totals):
+
+```bash
+docker compose logs -f worker
+```
+
+`LOG_LEVEL=DEBUG` in `.env` also logs the full prompts and responses. Prices
+for the cost are set in `.env` (`LLM_PRICE_INPUT_PER_M`, `LLM_PRICE_OUTPUT_PER_M`).
+
 ## Local Development
 
 Always use `uv` for running tasks to ensure consistency with the production environment:

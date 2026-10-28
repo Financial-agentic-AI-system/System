@@ -16,12 +16,17 @@ status/history feature possible at all. Confirmed empirically
 node's update, even for the parallel Financial/Sentiment/Macro fan-out.
 """
 
+import logging
+import time
 from datetime import date
 
+from src.agents import usage
 from src.agents.graph import compiled_graph
 from src.agents.state import DebateState, PredictResult
 from src.cache import debate_cache
 from src.worker.celery_app import app
+
+logger = logging.getLogger(__name__)
 
 
 def _run_debate(
@@ -43,24 +48,46 @@ def _run_debate(
         "final_result": None,
     }
     debate_cache.set_status(task_id, "RUNNING", round_number=1)
+    label = f"debate {task_id} {ticker} {horizon} as of {as_of_date}"
+    logger.info("%s started", label)
+    started = time.monotonic()
 
     round_number = 1
     final_result: PredictResult | None = None
-    try:
-        for delta in compiled_graph.stream(initial_state, stream_mode="updates"):
-            node_name, update = next(iter(delta.items()))
-            if "round_number" in update:
-                round_number = update["round_number"]
-            debate_cache.append_history(task_id, node_name, round_number, update)
-            debate_cache.set_status(
-                task_id, "RUNNING", round_number, current_node=node_name
+    with usage.track(debate_id=task_id) as debate_usage:
+        try:
+            for delta in compiled_graph.stream(initial_state, stream_mode="updates"):
+                node_name, update = next(iter(delta.items()))
+                if "round_number" in update:
+                    round_number = update["round_number"]
+                debate_cache.append_history(task_id, node_name, round_number, update)
+                debate_cache.set_status(
+                    task_id, "RUNNING", round_number, current_node=node_name
+                )
+                if node_name == "finalize":
+                    final_result = update["final_result"]
+        except Exception as exc:
+            debate_cache.set_status(task_id, "FAILED", round_number, error=str(exc))
+            logger.error(
+                "%s FAILED in round %d after %.1f s | %s | %s",
+                label,
+                round_number,
+                time.monotonic() - started,
+                debate_usage.summary(),
+                exc,
             )
-            if node_name == "finalize":
-                final_result = update["final_result"]
-    except Exception as exc:
-        debate_cache.set_status(task_id, "FAILED", round_number, error=str(exc))
-        raise
+            raise
 
+    logger.info(
+        "%s done: %s, confidence %.0f%%, %d round(s), critic %s, %.1f s | %s",
+        label,
+        final_result.direction,
+        final_result.confidence * 100,
+        final_result.rounds_used,
+        "agreed" if final_result.critic_agreed else "did not agree",
+        time.monotonic() - started,
+        debate_usage.summary(),
+    )
     debate_cache.set_result(task_id, final_result)
     debate_cache.set_status(task_id, "DONE", round_number, current_node="finalize")
     return final_result

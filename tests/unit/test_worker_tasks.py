@@ -190,3 +190,17 @@ def test_run_debate_task_accepts_iso_string_date(monkeypatch):
     tasks.run_debate.apply(args=["AAPL", "1W", "2025-12-30"])
 
     assert seen["as_of_date"] == date(2025, 12, 30)
+
+
+def test_run_debate_logs_a_summary(monkeypatch, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="src.worker.tasks")
+    fake_llm = _make_fake_llm(critic_agrees_after=0)
+    monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
+
+    tasks._run_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+
+    assert "debate t1 AAPL 1W as of 2025-12-30 started" in caplog.text
+    assert "debate t1 AAPL 1W as of 2025-12-30 done: BUY, confidence 60%" in caplog.text
+    assert "LLM call(s)" in caplog.text
