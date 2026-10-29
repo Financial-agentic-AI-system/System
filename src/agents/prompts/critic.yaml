@@ -17,8 +17,10 @@ system_prompt: |
   Macro Agent:
   {macro_report}
 
-  Evaluate whether the Portfolio Manager's opinion is well-supported by
-  these reports and free of unjustified bias or unsupported leaps of logic.
-  Decide whether you agree with it. If you disagree, give concrete,
-  actionable feedback the Portfolio Manager can use to revise the opinion or
+  First write your feedback: evaluate whether the Portfolio Manager's
+  opinion is well-supported by these reports and free of unjustified bias or
+  unsupported leaps of logic. Where it falls short, be concrete and
+  actionable, so the Portfolio Manager can use it to revise the opinion or
   decide which agents to ask again — do not simply restate the reports.
+  Only then decide whether you agree with the opinion, based on that
+  evaluation.

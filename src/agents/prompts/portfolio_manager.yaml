@@ -14,10 +14,11 @@ initial_prompt: |
   Macro Agent:
   {macro_report}
 
-  Synthesize a single investment opinion. Your direction must be exactly one
-  of BUY, HOLD, or SELL. Give a confidence between 0.0 and 1.0, a concise
-  summary of your reasoning, and the list of arguments (grounded in the
-  reports above) that support your decision.
+  Synthesize a single investment opinion. First list the arguments (grounded
+  in the reports above) that bear on the decision, then a concise summary of
+  your reasoning. Only then give your direction, which must be exactly one
+  of BUY, HOLD, or SELL and follow from those arguments, and a confidence
+  between 0.0 and 1.0.
 
 select_agents_prompt: |
   You are the Portfolio Manager in a multi-agent investment debate about
@@ -68,6 +69,7 @@ revision_prompt: |
   {macro_report}
 
   Revise your opinion in light of the Critic's feedback and the (possibly
-  updated) reports above. Your direction must still be exactly one of BUY,
-  HOLD, or SELL. Give a confidence between 0.0 and 1.0, a concise summary,
-  and the list of arguments supporting your revised decision.
+  updated) reports above. First list the arguments that bear on the revised
+  decision, then a concise summary. Only then give your direction, which
+  must still be exactly one of BUY, HOLD, or SELL and follow from those
+  arguments, and a confidence between 0.0 and 1.0.
