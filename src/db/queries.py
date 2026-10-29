@@ -18,10 +18,17 @@ from sqlalchemy.orm import Session, defer
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
 
 
+# SEC filing deadline for a 10-K (10-Q: 40-45 days) — a safe upper bound.
+REPORT_LAG_FALLBACK = timedelta(days=90)
+
+
 def fetch_fundamentals(
     session: Session, ticker: str, as_of_date: date, quarters: int = 40
 ) -> list[Fundamentals]:
-    """Rows for the last `quarters` distinct fiscal dates <= as_of_date.
+    """Rows for the last `quarters` distinct fiscal dates published by as_of_date.
+
+    A report counts once `reported_date <= as_of_date`; without a reported
+    date it is assumed published `REPORT_LAG_FALLBACK` after fiscal_date.
 
     Selects by distinct fiscal_date first, then fetches every report_type
     for those dates — a plain row-limit would cut a quarter's 3 report
@@ -30,7 +37,14 @@ def fetch_fundamentals(
     """
     date_stmt = (
         select(Fundamentals.fiscal_date)
-        .where(Fundamentals.symbol == ticker, Fundamentals.fiscal_date <= as_of_date)
+        .where(
+            Fundamentals.symbol == ticker,
+            func.coalesce(
+                Fundamentals.reported_date,
+                Fundamentals.fiscal_date + REPORT_LAG_FALLBACK,
+            )
+            <= as_of_date,
+        )
         .distinct()
         .order_by(Fundamentals.fiscal_date.desc())
         .limit(quarters)
@@ -204,6 +218,14 @@ def count_articles_without_embedding(
         )
     )
     return session.scalar(stmt) or 0
+
+
+def fetch_price_date_range(session: Session) -> tuple[date | None, date | None]:
+    """First and last date in stock_prices (None, None when empty)."""
+    first, last = session.execute(
+        select(func.min(StockPrice.date), func.max(StockPrice.date))
+    ).one()
+    return first, last
 
 
 def fetch_tickers(session: Session) -> list[str]:
