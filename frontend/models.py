@@ -26,8 +26,8 @@ class ApiError(RuntimeError):
 
 
 class AgentReport(BaseModel):
-    opinion: str
     reasoning: str
+    opinion: str
 
 
 class AgentReports(BaseModel):
@@ -37,15 +37,15 @@ class AgentReports(BaseModel):
 
 
 class PMOpinion(BaseModel):
+    arguments: list[str] = []
+    summary: str
     direction: Direction
     confidence: float = Field(ge=0.0, le=1.0)
-    summary: str
-    arguments: list[str] = []
 
 
 class CriticFeedback(BaseModel):
-    agree: bool
     feedback: str
+    agree: bool
 
 
 class PredictResult(BaseModel):
