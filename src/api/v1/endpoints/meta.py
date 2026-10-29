@@ -9,15 +9,21 @@ from src.api.v1.schemas import (
     HORIZONS,
     MetaResponse,
 )
+from src.db.queries import fetch_price_date_range
+from src.db.session import get_session
 
 router = APIRouter(tags=["meta"])
 
 
 @router.get("/meta", response_model=MetaResponse)
 def get_meta() -> MetaResponse:
+    with get_session() as session:
+        first, last = fetch_price_date_range(session)
+    start = max(first, BACKTEST_START) if first else BACKTEST_START
+    end = last if last else BACKTEST_END
     return MetaResponse(
         horizons=HORIZONS,
-        backtest_start=BACKTEST_START,
-        backtest_end=BACKTEST_END,
+        backtest_start=start,
+        backtest_end=max(end, start),
         max_rounds=MAX_ROUNDS,
     )

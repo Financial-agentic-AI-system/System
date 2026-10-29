@@ -17,7 +17,8 @@ from src.cache.schemas import DebateStatus, DebateStatusValue, HistoryEntry
 Horizon = Literal["1W", "1M", "3M"]
 HORIZONS: list[str] = list(get_args(Horizon))
 
-# Backtest window, docs/evaluation.md §3.3.
+# Backtest window, docs/evaluation.md §3.3. START is the floor set by the
+# model's training cutoff; /meta narrows both ends to the prices in the DB.
 BACKTEST_START = date(2025, 1, 1)
 BACKTEST_END = date(2026, 6, 30)
 

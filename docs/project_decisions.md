@@ -91,3 +91,10 @@ the backtest proxy allowlist moved there from `us-central1`.
 - **Structured output quirk.** Scout sometimes returns a structured answer
   wrapped as a function call (`{"type": "function", "parameters": {...}}`);
   `generate_structured` unwraps it.
+
+## 2026-10-29 — As-of date picker ends at the last price
+
+`/meta` no longer ends the window the longest horizon (92 days) before the
+last price: `backtest_end` is now the last date in `stock_prices`, so an
+analysis can use all loaded data. For evaluation the last scorable date is
+chosen by hand (last price minus the horizon).
