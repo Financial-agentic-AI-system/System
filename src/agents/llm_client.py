@@ -33,6 +33,8 @@ import google.auth.transport.requests
 import requests
 from pydantic import BaseModel, ValidationError
 
+from src.agents import usage
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
@@ -136,6 +138,9 @@ def _call(body: dict, parse: Callable[[dict], R], label: str, detail: str = "") 
     the full backoff schedule first.
     """
     url = _endpoint_url()
+    what = f"{label}{detail}"
+    logger.debug("prompt for %s:\n%s", what, body["messages"][0]["content"])
+    started = time.monotonic()
     last_error: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
@@ -146,7 +151,13 @@ def _call(body: dict, parse: Callable[[dict], R], label: str, detail: str = "") 
                 timeout=_TIMEOUT_S,
             )
             response.raise_for_status()
-            return parse(response.json())
+            data = response.json()
+            result = parse(data)
+            logger.debug("response for %s:\n%s", what, data["choices"][0]["message"])
+            usage.record_call(
+                what, data.get("usage"), time.monotonic() - started, attempt
+            )
+            return result
         except (
             requests.RequestException,
             KeyError,
@@ -158,8 +169,11 @@ def _call(body: dict, parse: Callable[[dict], R], label: str, detail: str = "") 
             if not _should_retry(exc):
                 break
             if attempt < _MAX_RETRIES:
-                time.sleep(_retry_delay(exc, attempt))
+                delay = _retry_delay(exc, attempt)
+                usage.record_retry(what, attempt, _MAX_RETRIES, delay, exc)
+                time.sleep(delay)
 
+    usage.record_failure(what, time.monotonic() - started, attempt, last_error)
     raise LLMClientError(
         f"{label} failed after {attempt} attempt(s){detail}: {last_error}"
     ) from last_error
