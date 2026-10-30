@@ -13,7 +13,7 @@ VS Code or `psql` are in `src/db/README.md`.
 
 ```mermaid
 flowchart LR
-    av[[Alpha Vantage / yfinance / FRED]] -->|data_scripts/*, manual| lake[(datalake/raw_data<br/>read-only)]
+    av[[Alpha Vantage / yfinance / FRED]] -->|scripts/data/*, manual| lake[(datalake/raw_data<br/>read-only)]
     lake -->|python -m src.db.load| loaders[src/db/loaders.py<br/>parse + upsert]
     loaders --> pg[(Postgres / pgvector)]
     loaders -->|articles only| emb[src/db/article_embeddings.py]

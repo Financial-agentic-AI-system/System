@@ -36,7 +36,7 @@ worker in the system runs the LangGraph debate (`src/worker/celery_app.py`).
 
 **Note — data ingestion is manual/dev-only, by design:** there is no API
 endpoint or scheduled job that refreshes the datalake. `data_fetcher`
-(`data_scripts/alpha_vantage_fetcher.py` and friends) and the DB loader are
+(`scripts/data/alpha_vantage_fetcher.py` and friends) and the DB loader are
 both run by hand from a terminal when a developer decides to pull new data.
 The backend never triggers either of them. This is a deliberate scope cut,
 not a gap — see `docs/evaluation.md` for why an automatic/scheduled fetch
@@ -72,7 +72,7 @@ debate history and shown on the frontend. See `docs/project_decisions.md`
 | Agents (graph) | PM, Critic, Financial/Sentiment/Macro agents, debate protocol | `src/agents/` | scaffold (empty) — see `docs/agents.md` for the protocol spec |
 | Retriever | Semantic search over pgvector — Sentiment agent only. `search_articles()` embeds the query and runs the point-in-time similarity query (`fetch_similar_articles` in `src/db/queries.py`). Plain SQLAlchemy + pgvector, no LangChain | `src/retriever/search.py` | search function done, tested (`tests/unit/test_article_search.py`); used by the Sentiment agent through the `search_articles` tool (`src/agents/nodes.py`) |
 | DB (Postgres/pgvector) | Relational storage + vector store; Financial/Macro agents query it directly via SQL | `src/db/` | **done, tested** (`tests/unit/test_db_loaders.py`) |
-| data_fetcher | Fetches market/fundamental/sentiment data from Alpha Vantage into the datalake — manual/dev-only, never triggered by the backend | `data_scripts/` | done (one-off CLI scripts) |
+| data_fetcher | Fetches market/fundamental/sentiment data from Alpha Vantage into the datalake — manual/dev-only, never triggered by the backend | `scripts/data/` | done (one-off CLI scripts) |
 | datalake/raw_data | External repo, read-only from this repo's POV | `../datalake/` (sibling repo) | populated for ~9-10 tickers |
 | LLM Source | Llama 4 Scout 17B-16E Instruct (MaaS) via Gemini Enterprise Agent Platform — see `docs/evaluation.md` §3.3 for why not a Gemini model | `src/agents/llm_client.py` | initial implementation — `generate_structured()` wired to the MaaS REST endpoint; not yet exercised against a live backtest |
 | Embeddings | Vertex AI `text-embedding-005`, 768 dims (`EMBEDDING_MODEL` to change). Article vectors are computed by `python -m src.db.load` right after the articles are upserted and stored in `article_summaries.summary_embedding` / `.title_summary_embedding` | `src/retriever/embeddings.py`, `src/db/article_embeddings.py` | **done, tested** (`tests/unit/test_embeddings.py`, `tests/unit/test_article_embeddings.py`) |
@@ -112,7 +112,7 @@ flowchart TD
 | `GET` | `/api/v1/tickers` | Tickers with data in the database → `{"tickers": ["AAPL", ...]}`. `503` if the database is down |
 
 Data ingestion has no endpoint by design (see note in §1) — a developer runs
-`data_scripts/*` and `python -m src.db.load` manually.
+`scripts/data/*` and `python -m src.db.load` manually.
 
 ## 5. Prediction output contract
 

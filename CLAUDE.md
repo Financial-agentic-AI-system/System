@@ -33,7 +33,7 @@ debate protocol (round limit, termination condition), and
 
 | Path                 | Purpose                                                                |
 | -------------------- | ----------------------------------------------------------------------- |
-| `data_scripts/`      | one-off CLI scripts; fetch raw data from Alpha Vantage into the datalake |
+| `scripts/data/`      | one-off CLI scripts; fetch raw data from Alpha Vantage into the datalake |
 | `notebooks/`         | experiments, not production code                                        |
 | `src/agents/`        | LangGraph debate: `states.py`, `nodes.py`, `graph.py`, prompts in `prompts/*.yaml` via `prompt_loader.py`. No SQL here — read queries live in `src/db/queries.py` |
 | `src/api/v1/`        | FastAPI routes — 6 endpoints, see `endpoints/`                          |
@@ -50,7 +50,7 @@ debate protocol (round limit, termination condition), and
 - **IMPORTANT**: loading the datalake into Postgres (and embedding the
   articles) is a plain one-off script, never a Celery task and never
   triggered by the backend. It's run manually by a developer:
-  `python -m src.db.load`. Same for data ingestion (`data_scripts/*`) — there
+  `python -m src.db.load`. Same for data ingestion (`scripts/data/*`) — there
   is no API endpoint for either; this is a deliberate scope cut, not a gap
   (see `docs/ARCHITECTURE.md`).
 - **IMPORTANT**: agent prompts live in `src/agents/prompts/*.yaml` and are
@@ -88,7 +88,7 @@ uv run python -m src.db.load
 Fetch raw data from Alpha Vantage into the datalake:
 
 ```bash
-uv run python data_scripts/alpha_vantage_fetcher.py --functions INCOME_STATEMENT,TIME_SERIES_DAILY --tickers AAPL,TSLA --period annual
+uv run python scripts/data/alpha_vantage_fetcher.py --functions INCOME_STATEMENT,TIME_SERIES_DAILY --tickers AAPL,TSLA --period annual
 ```
 
 Run unit tests:
