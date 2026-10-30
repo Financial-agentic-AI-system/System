@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session, defer
 
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
 
-
 # SEC filing deadline for a 10-K (10-Q: 40-45 days) — a safe upper bound.
 REPORT_LAG_FALLBACK = timedelta(days=90)
 

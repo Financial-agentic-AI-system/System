@@ -43,7 +43,8 @@ class Fundamentals(Base):
     report_type: Mapped[str] = mapped_column(String(32), index=True)
     period: Mapped[str] = mapped_column(String(16))
     fiscal_date: Mapped[dt.date | None] = mapped_column(Date, index=True)
-    # Publication date (Alpha Vantage EARNINGS.reportedDate); None for old files, from previous datalake version.
+    # Publication date (Alpha Vantage EARNINGS.reportedDate); None for files from
+    # the previous datalake version.
     reported_date: Mapped[dt.date | None] = mapped_column(Date, index=True)
     data: Mapped[dict] = mapped_column(JSONB)
 

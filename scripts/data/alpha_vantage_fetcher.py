@@ -49,7 +49,7 @@ def save_to_json(
     period: str = "all",
     reported_dates: dict[str, str] | None = None,
 ):
-    """Saves {TICKER}_{annual|quarterly}.json (both for "all") with reportedDate added."""
+    """Saves {TICKER}_{annual|quarterly}.json (both for "all"), adds reportedDate."""
     period_map = {"annual": "annualReports", "quarterly": "quarterlyReports"}
 
     dir_path = OUTPUT_BASE_DIR / function_name

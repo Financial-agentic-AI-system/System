@@ -51,7 +51,7 @@ def fetch_and_save_fred_data(
 )
 def main(series: str, years: int, end: datetime.datetime):
     """
-    Script fetching macroeconomic data from the FRED database to feed the Macroeconomic Agent.
+    Script fetching macroeconomic data from FRED to feed the Macroeconomic Agent.
     """
     series_list = [s.strip() for s in series.split(",")]
 
@@ -62,7 +62,8 @@ def main(series: str, years: int, end: datetime.datetime):
         f"=== Fetching macro data from the last {years} years ===", fg="cyan", bold=True
     )
     click.secho(
-        f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n",
+        f"Period: {start_date.strftime('%Y-%m-%d')} "
+        f"to {end_date.strftime('%Y-%m-%d')}\n",
         fg="cyan",
     )
 

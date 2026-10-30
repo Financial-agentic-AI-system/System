@@ -96,7 +96,10 @@ def save_to_csv(data, output_file: str):
     help="Data interval (1d for daily, 1h for hourly, etc.)",
 )
 @click.option(
-    "--output", "-o", default="stock_prices_daily_from_2010.csv", help="Output CSV filename in datalake"
+    "--output",
+    "-o",
+    default="stock_prices_daily_from_2010.csv",
+    help="Output CSV filename in datalake",
 )
 def main(
     tickers: str,

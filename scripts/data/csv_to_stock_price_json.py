@@ -58,7 +58,10 @@ def save_stock_json(
     "--tickers",
     "tickers",
     default=None,
-    help="Comma-separated list of tickers to export. By default all tickers are processed.",
+    help=(
+        "Comma-separated list of tickers to export. "
+        "By default all tickers are processed."
+    ),
 )
 @click.option(
     "--price-field",

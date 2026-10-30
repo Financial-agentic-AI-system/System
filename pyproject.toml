@@ -73,6 +73,7 @@ exclude = [
 
 [tool.ruff.lint]
 # E: pycodestyle, F: Pyflakes, I: isort (to sort imports)
+select = ["E", "F", "I"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
