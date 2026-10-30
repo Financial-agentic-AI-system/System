@@ -175,5 +175,6 @@ store).
 - `docs/agents.md` — full debate protocol (round limit, termination rule)
 - `docs/evaluation.md` — backtesting methodology, network-isolation design,
   metrics
+- `docs/database.md` — tables, loading pipeline, point-in-time queries
 - `docs/project_decisions.md` — decision log (currently empty, needs content
   or should be replaced by `docs/adr/`)
