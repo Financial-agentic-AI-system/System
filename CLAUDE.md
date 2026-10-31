@@ -88,7 +88,7 @@ uv run python -m src.db.load
 Fetch raw data from Alpha Vantage into the datalake:
 
 ```bash
-uv run python scripts/data/alpha_vantage_fetcher.py --functions INCOME_STATEMENT,TIME_SERIES_DAILY --tickers AAPL,TSLA --period annual
+uv run python scripts/data/alpha_vantage_fetcher.py --functions INCOME_STATEMENT,BALANCE_SHEET,CASH_FLOW --tickers AAPL,TSLA --period quarterly
 ```
 
 Run unit tests:

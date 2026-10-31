@@ -98,7 +98,7 @@ The ingestion tool supports the following arguments:
 
 | Short | Long Flag | Required | Description | Default |
 | :--- | :--- | :---: | :--- | :--- |
-| `-f` | `--functions` | **Yes** | Comma-separated list of Alpha Vantage API functions (e.g., `INCOME_STATEMENT,TIME_SERIES_DAILY`). | *None* |
+| `-f` | `--functions` | **Yes** | Comma-separated list of financial statements: `INCOME_STATEMENT`, `BALANCE_SHEET`, `CASH_FLOW`. | *None* |
 | `-t` | `--tickers` | No | Comma-separated list of stock symbols (e.g., `AAPL,TSLA`). | `AAPL,MSFT,NVDA,JPM,GS...` |
 | `-p` | `--period` | No | Filter for fundamental data reports. Available options: `annual`, `quarterly`, `all`. | `all` |
 

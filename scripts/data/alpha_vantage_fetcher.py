@@ -12,6 +12,8 @@ API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
 DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA,PLTR"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
+FUNDAMENTAL_FUNCTIONS = {"BALANCE_SHEET", "CASH_FLOW", "INCOME_STATEMENT"}
+REQUEST_PAUSE_S = 15
 
 
 def fetch_data(ticker: str, function_name: str) -> dict | None:
@@ -26,14 +28,26 @@ def fetch_data(ticker: str, function_name: str) -> dict | None:
 
 
 def fetch_reported_dates(ticker: str) -> dict[str, str]:
-    """fiscalDateEnding -> reportedDate (publication date) from EARNINGS."""
+    """fiscalDateEnding -> reportedDate (publication date) from EARNINGS.
+
+    The loader uses it to make a report visible only once it was published
+    (src/db/queries.py, fetch_fundamentals).
+    """
     data = fetch_data(ticker, "EARNINGS") or {}
-    time.sleep(15)
-    return {
+    time.sleep(REQUEST_PAUSE_S)
+    dates = {
         e["fiscalDateEnding"]: e["reportedDate"]
         for e in data.get("quarterlyEarnings", [])
         if e.get("fiscalDateEnding") and e.get("reportedDate")
     }
+    if not dates:
+        reason = data.get("Information") or data.get("Note") or "no quarterlyEarnings"
+        click.secho(
+            f"  -> WARNING: no reportedDate for {ticker} ({reason}); "
+            "the loader will assume fiscal date + 90 days",
+            fg="yellow",
+        )
+    return dates
 
 
 def _write(data, file_path: Path):
@@ -52,14 +66,18 @@ def save_to_json(
     """Saves {TICKER}_{annual|quarterly}.json (both for "all"), adds reportedDate."""
     period_map = {"annual": "annualReports", "quarterly": "quarterlyReports"}
 
-    dir_path = OUTPUT_BASE_DIR / function_name
-    dir_path.mkdir(parents=True, exist_ok=True)
-
     periods = list(period_map) if period == "all" else [period]
     periods = [p for p in periods if period_map[p] in data]
     if not periods:
-        _write(data, dir_path / f"{ticker}.json")
+        click.secho(
+            f"  -> WARNING: no {period} reports in {function_name} for {ticker}, "
+            "nothing saved",
+            fg="red",
+        )
         return
+
+    dir_path = OUTPUT_BASE_DIR / function_name
+    dir_path.mkdir(parents=True, exist_ok=True)
 
     for p in periods:
         reports = data[period_map[p]]
@@ -92,7 +110,11 @@ def main(functions: str, tickers: str, period: str):
 
     for ticker in ticker_list:
         click.secho(f"--- Stock: {ticker} ---", fg="cyan", bold=True)
-        reported_dates = fetch_reported_dates(ticker)
+        reported_dates = (
+            fetch_reported_dates(ticker)
+            if FUNDAMENTAL_FUNCTIONS.intersection(func_list)
+            else None
+        )
         for func in func_list:
             data = fetch_data(ticker, func)
 
@@ -102,7 +124,7 @@ def main(functions: str, tickers: str, period: str):
                 error_msg = data.get("Information", data.get("Note", "API error"))
                 click.secho(f"  -> WARNING: {error_msg}", fg="red")
 
-            time.sleep(15)
+            time.sleep(REQUEST_PAUSE_S)
 
 
 if __name__ == "__main__":
