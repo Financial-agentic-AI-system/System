@@ -98,7 +98,7 @@ The ingestion tool supports the following arguments:
 
 | Short | Long Flag | Required | Description | Default |
 | :--- | :--- | :---: | :--- | :--- |
-| `-f` | `--functions` | **Yes** | Comma-separated list of Alpha Vantage API functions (e.g., `INCOME_STATEMENT,TIME_SERIES_DAILY`). | *None* |
+| `-f` | `--functions` | **Yes** | Comma-separated list of financial statements: `INCOME_STATEMENT`, `BALANCE_SHEET`, `CASH_FLOW`. | *None* |
 | `-t` | `--tickers` | No | Comma-separated list of stock symbols (e.g., `AAPL,TSLA`). | `AAPL,MSFT,NVDA,JPM,GS...` |
 | `-p` | `--period` | No | Filter for fundamental data reports. Available options: `annual`, `quarterly`, `all`. | `all` |
 
@@ -108,7 +108,7 @@ The system includes a generic CLI tool for fetching data from Alpha Vantage.
 Basic usage:
 
 ```bash
-python data_scripts/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <TICKERS> --period <PERIOD>
+python scripts/data/alpha_vantage_fetcher.py --functions <FUNCTIONS> --tickers <TICKERS> --period <PERIOD>
 ```
 #### Loading data into db
 

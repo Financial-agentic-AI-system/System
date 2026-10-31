@@ -14,7 +14,7 @@ st.caption(
     "Portfolio Manager and a Critic. The result is a BUY / HOLD / SELL call."
 )
 
-DEFAULT_AS_OF = date(2026, 1, 15)
+DEFAULT_AS_OF = date(2025, 1, 15)
 
 
 @st.cache_data(ttl=300, show_spinner=False)

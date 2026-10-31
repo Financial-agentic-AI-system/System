@@ -17,6 +17,9 @@ _ADDED_COLUMNS: tuple[str, ...] = (
     f"ADD COLUMN IF NOT EXISTS summary_embedding vector({EMBEDDING_DIM})",
     "ALTER TABLE article_summaries "
     f"ADD COLUMN IF NOT EXISTS title_summary_embedding vector({EMBEDDING_DIM})",
+    "ALTER TABLE fundamentals ADD COLUMN IF NOT EXISTS reported_date DATE",
+    "CREATE INDEX IF NOT EXISTS ix_fundamentals_reported_date "
+    "ON fundamentals (reported_date)",
 )
 
 

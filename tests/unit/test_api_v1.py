@@ -352,18 +352,44 @@ def test_fetch_tickers_query():
 # --------------------------------------------------------------------------- #
 # GET /meta and max_rounds in /debate_status
 # --------------------------------------------------------------------------- #
-def test_meta_exposes_backend_settings(client):
+def _meta(client, monkeypatch, first, last):
+    from contextlib import nullcontext
+
+    from src.api.v1.endpoints import meta
+
+    monkeypatch.setattr(meta, "get_session", lambda: nullcontext())
+    monkeypatch.setattr(meta, "fetch_price_date_range", lambda session: (first, last))
+    return client.get("/api/v1/meta")
+
+
+def test_meta_exposes_backend_settings(client, monkeypatch):
     from src.agents.state import MAX_ROUNDS
 
-    resp = client.get("/api/v1/meta")
+    resp = _meta(client, monkeypatch, date(2010, 1, 4), date(2026, 9, 30))
 
     assert resp.status_code == 200
     assert resp.json() == {
         "horizons": ["1W", "1M", "3M"],
         "backtest_start": "2025-01-01",
-        "backtest_end": "2026-06-30",
+        "backtest_end": "2026-09-30",
         "max_rounds": MAX_ROUNDS,
     }
+
+
+def test_meta_window_follows_prices_in_db(client, monkeypatch):
+    body = _meta(client, monkeypatch, date(2025, 3, 3), date(2026, 12, 31)).json()
+    assert (body["backtest_start"], body["backtest_end"]) == (
+        "2025-03-03",
+        "2026-12-31",
+    )
+
+
+def test_meta_falls_back_without_prices(client, monkeypatch):
+    body = _meta(client, monkeypatch, None, None).json()
+    assert (body["backtest_start"], body["backtest_end"]) == (
+        "2025-01-01",
+        "2026-06-30",
+    )
 
 
 def test_debate_status_carries_round_limit(client):
