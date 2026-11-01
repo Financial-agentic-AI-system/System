@@ -24,6 +24,7 @@ from uuid import uuid4
 from scripts.evaluation.io import (
     EVALUATION_DIR,
     append_jsonl,
+    compact_predictions,
     read_jsonl,
     write_jsonl,
     write_meta,
@@ -99,6 +100,10 @@ def cmd_predict(args) -> None:
         labels_file=args.labels,
         n_samples=len(samples),
     )
+
+    kept, dropped = compact_predictions(out)
+    if dropped:
+        print(f"{out.name}: kept {kept} successful rows, dropped {dropped} failed")
 
     done = {
         (r["ticker"], r["as_of"], r["horizon"])
