@@ -22,7 +22,7 @@ real database (see tests/unit/test_agents_nodes.py). This script needs:
         uv run python -m src.db.load
   - ADC + GCP_PROJECT_ID/GCP_LOCATION set, same prereqs as test_llm_client.py
   - a ticker/date that's actually covered by your local datalake — check what
-    you ingested via data_scripts/alpha_vantage_fetcher.py
+    you ingested via scripts/data/alpha_vantage_fetcher.py
 
 Usage:
     uv run python tests/integration/test_agent_db_integration.py TSLA 2025-06-01

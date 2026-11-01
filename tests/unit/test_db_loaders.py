@@ -85,6 +85,7 @@ def raw_data(tmp_path: Path) -> Path:
                 "reports": [
                     {
                         "fiscalDateEnding": "2025-12-31",
+                        "reportedDate": "2026-01-29",
                         "totalAssets": "379297000000",
                         "goodwill": "None",
                     }
@@ -145,6 +146,8 @@ def test_iter_fundamentals(raw_data: Path):
     assert row["report_type"] == "BALANCE_SHEET"
     assert row["period"] == "quarterly"
     assert row["fiscal_date"] == dt.date(2025, 12, 31)
+    assert row["reported_date"] == dt.date(2026, 1, 29)
+    assert "reportedDate" not in row["data"]
     assert row["data"]["totalAssets"] == 379297000000
     assert row["data"]["goodwill"] is None
 

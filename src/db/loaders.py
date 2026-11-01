@@ -152,6 +152,7 @@ def iter_fundamentals(raw_data: Path) -> Iterator[dict]:
                     "report_type": report_type,
                     "period": period,
                     "fiscal_date": parse_date(report.get("fiscalDateEnding")),
+                    "reported_date": parse_date(cleaned.pop("reportedDate", None)),
                     "data": cleaned,
                 }
 

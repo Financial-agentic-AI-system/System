@@ -42,20 +42,28 @@ def fetch_and_save_fred_data(
 @click.option(
     "--years", "-y", default=10, type=int, help="Number of years back to fetch"
 )
-def main(series: str, years: int):
+@click.option(
+    "--end",
+    "-e",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=datetime.datetime.today(),
+    help="End date (YYYY-MM-DD)",
+)
+def main(series: str, years: int, end: datetime.datetime):
     """
-    Script fetching macroeconomic data from the FRED database to feed the Macroeconomic Agent.
+    Script fetching macroeconomic data from FRED to feed the Macroeconomic Agent.
     """
     series_list = [s.strip() for s in series.split(",")]
 
-    end_date = datetime.datetime.today()
+    end_date = end
     start_date = end_date - datetime.timedelta(days=years * 365)
 
     click.secho(
         f"=== Fetching macro data from the last {years} years ===", fg="cyan", bold=True
     )
     click.secho(
-        f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}\n",
+        f"Period: {start_date.strftime('%Y-%m-%d')} "
+        f"to {end_date.strftime('%Y-%m-%d')}\n",
         fg="cyan",
     )
 

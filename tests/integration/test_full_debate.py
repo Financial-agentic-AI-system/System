@@ -36,12 +36,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  
 
-from dotenv import load_dotenv  
+from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.agents.graph import compiled_graph  
-from src.agents.state import DebateState  
+from src.agents.graph import compiled_graph
+from src.agents.state import DebateState
 
 
 def main() -> None:

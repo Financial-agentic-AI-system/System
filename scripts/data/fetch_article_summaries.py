@@ -20,7 +20,7 @@ Date range and relevance filter:
   * additionally drops articles with relevance_score < --min-relevance (default 0.9).
 
 Examples:
-    python fetch_article_summaries.py                          # 9 tickers, 2025-01..2026-06
+    python fetch_article_summaries.py                     # 10 tickers, 2025-01..2026-09
     python fetch_article_summaries.py -t AAPL,NVDA
     python fetch_article_summaries.py --start 2025-01 --end 2026-06 --chunk-months 3
 """
@@ -39,7 +39,7 @@ load_dotenv()
 
 AV_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA"
+DEFAULT_TICKERS = "AAPL,CAT,GS,INTC,META,NFLX,NVDA,SMCI,TSLA,PLTR"
 OUTPUT_BASE_DIR = Path("../datalake/raw_data")
 
 AV_BASE = "https://www.alphavantage.co/query"
@@ -115,7 +115,7 @@ def fetch_news_feed(
     end_month: int,
     chunk_months: int,
 ) -> list:
-    """Fetches the NEWS_SENTIMENT feed for the whole range, by windows, deduped by URL."""
+    """Fetches the NEWS_SENTIMENT feed for the range in windows, deduped by URL."""
     feed, seen = [], set()
     for time_from, time_to in date_windows(
         start_year, start_month, end_year, end_month, chunk_months
@@ -225,7 +225,7 @@ def parse_ym(s: str):
 )
 @click.option("--start", default="2025-01", help="Range start in YYYY-MM format")
 @click.option(
-    "--end", default="2026-06", help="Range end in YYYY-MM format (inclusive)"
+    "--end", default="2026-09", help="Range end in YYYY-MM format (inclusive)"
 )
 @click.option(
     "--min-relevance",
