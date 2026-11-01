@@ -275,19 +275,6 @@ A `BUY/HOLD/SELL` signal needs a comparison point, not just raw accuracy.
   (0–0.5, 0.5–0.7, 0.7–1), with accuracy per bucket, to check whether
   high-confidence calls are actually more often correct.
 
-**Planned:**
-
-- **Confidence intervals** for accuracy and for the difference to a baseline,
-  using a block bootstrap by ticker and quarter (the samples are correlated,
-  §4.2).
-- **Baselines:** buy-and-hold, naive momentum (sign of the last N-day return),
-  random signal (as a sanity floor).
-- **Financial metrics:** cumulative return of a strategy that follows the
-  signals vs. the baselines above; max drawdown.
-- **Ablation:** re-run the debate with one worker agent silenced at a time
-  (Financial-only, Sentiment-only, Macro-only, no-Critic) to show which agents
-  actually move the outcome — evidence for the thesis that the multi-agent
-  structure adds value over a single LLM call.
 
 ## 6. Known limitations
 

@@ -14,7 +14,6 @@ Labels and predictions go to datalake/evaluation (override: EVALUATION_DIR).
 """
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -32,7 +31,7 @@ from scripts.evaluation.samples import Sample, build_grid
 from src.agents import llm_client
 from src.agents.volatility import VOL_SPAN
 from src.db.session import get_session
-from src.worker.tasks import _run_debate
+from src.worker.tasks import execute_debate
 
 
 # ------------------------------------------------------------------ labels --
@@ -57,7 +56,7 @@ def run_one(sample: Sample, attempts: int = 3) -> dict:
     }
     for attempt in range(attempts):  # the proxy is occasionally flaky
         try:
-            res = _run_debate(
+            res = execute_debate(
                 sample.ticker, sample.horizon, sample.as_of, task_id=f"eval-{uuid4()}"
             )
             return {
@@ -99,13 +98,13 @@ def cmd_predict(args) -> None:
         todo = todo[: args.limit]
     print(f"run {run_id}: {len(done)} done, {len(todo)} to run")
 
-    with ThreadPoolExecutor(args.workers) as pool:
-        for i, row in enumerate(pool.map(run_one, todo), 1):
-            append_jsonl(out, row)
-            print(
-                f"[{i}/{len(todo)}] {row['ticker']} {row['as_of']} -> "
-                f"{row['direction']} {row['error'] or ''}"
-            )
+    for i, sample in enumerate(todo, 1):  # sequential on purpose, no threads
+        row = run_one(sample)
+        append_jsonl(out, row)
+        print(
+            f"[{i}/{len(todo)}] {row['ticker']} {row['as_of']} -> "
+            f"{row['direction']} {row['error'] or ''}"
+        )
 
 
 # ----------------------------------------------------------------- metrics --
@@ -154,7 +153,6 @@ def main() -> None:
     p = sub.add_parser("predict")
     p.add_argument("--labels", default=str(EVALUATION_DIR / "labels_1M_k1.jsonl"))
     p.add_argument("--run-id")
-    p.add_argument("--workers", type=int, default=2)
     p.add_argument("--limit", type=int)
     p.set_defaults(fn=cmd_predict)
 
