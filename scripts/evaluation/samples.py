@@ -5,7 +5,7 @@ from datetime import date
 
 from dateutil.relativedelta import relativedelta
 
-TICKERS = ["AAPL", "CAT", "GS", "INTC", "META", "NFLX", "NVDA", "SMCI", "TSLA"]
+TICKERS = ["AAPL", "CAT", "GS", "INTC", "META", "NFLX", "NVDA", "PLTR", "SMCI", "TSLA"]
 
 
 @dataclass(frozen=True)

@@ -8,7 +8,9 @@
     docker compose --profile backtest run --rm backtest-worker \
         uv run --no-sync python -m scripts.evaluation.evaluate predict --run-id r1
     python -m scripts.evaluation.evaluate metrics \
-        --predictions results/predictions_r1.jsonl --k 0.5 1 1.5 2
+        --predictions ../datalake/evaluation/predictions_r1.jsonl --k 0.5 1 1.5 2
+
+Labels and predictions go to datalake/evaluation (override: EVALUATION_DIR).
 """
 
 import argparse
@@ -18,7 +20,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from scripts.evaluation.io import (
-    RESULTS_DIR,
+    EVALUATION_DIR,
     append_jsonl,
     read_jsonl,
     write_jsonl,
@@ -38,7 +40,7 @@ def cmd_labels(args) -> None:
     samples = build_grid(date.fromisoformat(args.start), args.months, args.horizon)
     with get_session() as session:
         labels, skipped = build_labels(session, samples, args.k, args.span)
-    out = RESULTS_DIR / f"labels_{args.horizon}_k{args.k:g}.jsonl"
+    out = EVALUATION_DIR / f"labels_{args.horizon}_k{args.k:g}.jsonl"
     write_jsonl(out, labels)
     dist = {c: sum(r["label"] == c for r in labels) for c in ("BUY", "HOLD", "SELL")}
     print(f"{len(labels)} labels -> {out}   skipped: {len(skipped)}   {dist}")
@@ -79,9 +81,9 @@ def cmd_predict(args) -> None:
         for r in read_jsonl(Path(args.labels))
     ]
     run_id = args.run_id or datetime.now().strftime("%Y%m%d-%H%M")
-    out = RESULTS_DIR / f"predictions_{run_id}.jsonl"
+    out = EVALUATION_DIR / f"predictions_{run_id}.jsonl"
     write_meta(
-        RESULTS_DIR / f"predictions_{run_id}.meta.json",
+        EVALUATION_DIR / f"predictions_{run_id}.meta.json",
         model_version=llm_client.MODEL_VERSION,
         labels_file=args.labels,
         n_samples=len(samples),
@@ -144,13 +146,13 @@ def main() -> None:
     p = sub.add_parser("labels")
     p.add_argument("--horizon", default="1M", choices=["1W", "1M", "3M"])
     p.add_argument("--start", default="2025-02-01")
-    p.add_argument("--months", type=int, default=9)
+    p.add_argument("--months", type=int, default=19)
     p.add_argument("--k", type=float, default=1.0)
     p.add_argument("--span", type=int, default=VOL_SPAN)
     p.set_defaults(fn=cmd_labels)
 
     p = sub.add_parser("predict")
-    p.add_argument("--labels", default="results/labels_1M_k1.jsonl")
+    p.add_argument("--labels", default=str(EVALUATION_DIR / "labels_1M_k1.jsonl"))
     p.add_argument("--run-id")
     p.add_argument("--workers", type=int, default=2)
     p.add_argument("--limit", type=int)

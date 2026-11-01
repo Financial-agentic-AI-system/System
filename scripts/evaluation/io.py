@@ -1,11 +1,14 @@
-"""JSONL / meta.json helpers for results/ (files, deliberately not the DB)."""
+"""JSONL / meta.json helpers for the evaluation folder (files, not the DB)."""
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-RESULTS_DIR = Path("results")
+# Labels and predictions live in the datalake repo (datalake/evaluation), next to
+# raw_data. Inside the backtest container it is mounted at /datalake/evaluation.
+EVALUATION_DIR = Path(os.getenv("EVALUATION_DIR", "../datalake/evaluation"))
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "agents" / "prompts"
 
 
