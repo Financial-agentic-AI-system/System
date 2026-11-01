@@ -2,18 +2,21 @@
 
   labels   ground truth from prices           (no LLM)
   predict  run the debates for those samples  (LLM; run in backtest-worker)
-  metrics  join predictions with labels, report (any k, no re-run of debates)
+  metrics  join predictions with labels files, report (no DB, no LLM)
 
-    python -m scripts.evaluation.evaluate labels --horizon 1M --k 1
+    python -m scripts.evaluation.evaluate labels --horizon 1M --k 0.5 1 1.5 2
     docker compose --profile backtest run --rm backtest-worker \
         uv run --no-sync python -m scripts.evaluation.evaluate predict --run-id r1
     python -m scripts.evaluation.evaluate metrics \
         --predictions ../datalake/evaluation/predictions_r1.jsonl --k 0.5 1 1.5 2
 
-Labels and predictions go to datalake/evaluation (override: EVALUATION_DIR).
+Everything goes to datalake/evaluation (override: EVALUATION_DIR): one
+labels_<horizon>_k<k>.jsonl per k, predictions_<run>.jsonl (+ .meta.json) and
+metrics_<run>.json. `metrics` needs a labels file for every k it is asked for.
 """
 
 import argparse
+import json
 from datetime import date, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -35,16 +38,25 @@ from src.worker.tasks import execute_debate
 
 
 # ------------------------------------------------------------------ labels --
+def labels_path(horizon: str, k: float) -> Path:
+    return EVALUATION_DIR / f"labels_{horizon}_k{k:g}.jsonl"
+
+
 def cmd_labels(args) -> None:
     samples = build_grid(date.fromisoformat(args.start), args.months, args.horizon)
-    with get_session() as session:
-        labels, skipped = build_labels(session, samples, args.k, args.span)
-    out = EVALUATION_DIR / f"labels_{args.horizon}_k{args.k:g}.jsonl"
-    write_jsonl(out, labels)
-    dist = {c: sum(r["label"] == c for r in labels) for c in ("BUY", "HOLD", "SELL")}
-    print(f"{len(labels)} labels -> {out}   skipped: {len(skipped)}   {dist}")
-    for s in skipped:
-        print("  skipped", s)
+    for k in args.k:
+        with get_session() as session:
+            labels, skipped = build_labels(session, samples, k, args.span)
+        out = labels_path(args.horizon, k)
+        write_jsonl(out, labels)
+        dist = {
+            c: sum(r["label"] == c for r in labels) for c in ("BUY", "HOLD", "SELL")
+        }
+        print(
+            f"k={k:g}: {len(labels)} labels -> {out}   skipped: {len(skipped)}   {dist}"
+        )
+        for s in skipped:
+            print("  skipped", s)
 
 
 # ----------------------------------------------------------------- predict --
@@ -108,22 +120,37 @@ def cmd_predict(args) -> None:
 
 
 # ----------------------------------------------------------------- metrics --
+def load_labels(horizons: set[str], k: float) -> list[dict]:
+    """Labels of every horizon in the predictions, from the labels files."""
+    rows: list[dict] = []
+    for horizon in sorted(horizons):
+        path = labels_path(horizon, k)
+        if not path.exists():
+            raise SystemExit(
+                f"missing {path}; create it with: "
+                "python -m scripts.evaluation.evaluate labels "
+                f"--horizon {horizon} --k {k:g}"
+            )
+        rows += read_jsonl(path)
+    return rows
+
+
 def cmd_metrics(args) -> None:
-    preds = read_jsonl(Path(args.predictions))
-    samples = {
-        (p["ticker"], p["as_of"], p["horizon"]): Sample(
-            p["ticker"], date.fromisoformat(p["as_of"]), p["horizon"]
-        )
-        for p in preds
-    }
-    failed = sum(1 for p in preds if not p.get("direction"))
-    print(f"{len(samples)} samples in file, failed calls: {failed}")
+    pred_path = Path(args.predictions)
+    preds = read_jsonl(pred_path)
+    keys = {(p["ticker"], p["as_of"], p["horizon"]) for p in preds}
+    ok = {(p["ticker"], p["as_of"], p["horizon"]) for p in preds if p.get("direction")}
+    horizons = {key[2] for key in keys}
+    print(f"{len(keys)} samples in file, without a successful call: {len(keys - ok)}")
 
     summary = []
     for k in args.k:
-        with get_session() as session:
-            labels, _ = build_labels(session, list(samples.values()), k, args.span)
-        res = evaluate(join(preds, labels))
+        labels = load_labels(horizons, k)
+        rows = join(preds, labels)
+        unlabeled = len(ok) - len(rows)
+        if unlabeled:
+            print(f"k={k:g}: {unlabeled} predictions have no label (ignored)")
+        res = evaluate(rows)
         print("\n" + format_report(res, title=f"=== k = {k:g} ==="))
         summary.append((k, res))
 
@@ -136,6 +163,23 @@ def cmd_metrics(args) -> None:
                     f"{r['majority_baseline']:>7.1%}  {r['true_dist']}"
                 )
 
+    run_id = pred_path.stem.removeprefix("predictions_")
+    out = EVALUATION_DIR / f"metrics_{run_id}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        json.dumps(
+            {
+                "predictions_file": str(pred_path),
+                "samples": len(keys),
+                "without_successful_call": len(keys - ok),
+                "results": {f"{k:g}": res for k, res in summary},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"\nsaved -> {out}")
+
 
 # -------------------------------------------------------------------- main --
 def main() -> None:
@@ -146,12 +190,12 @@ def main() -> None:
     p.add_argument("--horizon", default="1M", choices=["1W", "1M", "3M"])
     p.add_argument("--start", default="2025-02-01")
     p.add_argument("--months", type=int, default=19)
-    p.add_argument("--k", type=float, default=1.0)
+    p.add_argument("--k", type=float, nargs="+", default=[1.0])
     p.add_argument("--span", type=int, default=VOL_SPAN)
     p.set_defaults(fn=cmd_labels)
 
     p = sub.add_parser("predict")
-    p.add_argument("--labels", default=str(EVALUATION_DIR / "labels_1M_k1.jsonl"))
+    p.add_argument("--labels", default=str(labels_path("1M", 1.0)))
     p.add_argument("--run-id")
     p.add_argument("--limit", type=int)
     p.set_defaults(fn=cmd_predict)
@@ -159,7 +203,6 @@ def main() -> None:
     p = sub.add_parser("metrics")
     p.add_argument("--predictions", required=True)
     p.add_argument("--k", type=float, nargs="+", default=[1.0])
-    p.add_argument("--span", type=int, default=VOL_SPAN)
     p.set_defaults(fn=cmd_metrics)
 
     args = ap.parse_args()

@@ -188,7 +188,8 @@ Machine Learning*, ch. 3), checked on daily closes after `as_of`:
   sessions are negligible). The `sqrt(n)` scaling assumes independent daily
   returns, so the std of an `n`-day return is `sqrt(n)` times the daily one.
 - **`k`** is the number of standard deviations. The main result uses `k = 1`;
-  `metrics` accepts several values to show how the conclusion depends on it.
+  `labels` and `metrics` accept several values to show how the conclusion
+  depends on it.
 
 The Portfolio Manager prompt states this definition (the horizon, `sigma_h` as a
 percentage, and what BUY / HOLD / SELL mean), computed by the same
@@ -215,9 +216,10 @@ Labels and predictions are files in the datalake repository, next to
 
 ```
 datalake/evaluation/
-  labels_1M_k1.jsonl             one row per sample: p0, sigma_h, barriers, label, touch_date
+  labels_1M_k<k>.jsonl           one file per k; one row per sample: p0, sigma_h, barriers, label, touch_date, ret_end
   predictions_<run_id>.jsonl     one row per debate: direction, confidence, rounds, error
   predictions_<run_id>.meta.json model version, prompts hash, labels file, sample count
+  metrics_<run_id>.json          result of `metrics` for every k (accuracy, baseline, confusion, calibration)
 ```
 
 The folder is set by `EVALUATION_DIR` (default `../datalake/evaluation`; in the
@@ -225,16 +227,16 @@ container `/datalake/evaluation`, mounted writable inside the otherwise
 read-only `/datalake`).
 
 ```bash
-# 1. labels (host, needs Postgres with prices)
+# 1. labels (host, needs Postgres with prices); one file per k
 docker compose up -d postgres redis
-uv run python -m scripts.evaluation.evaluate labels --horizon 1M --k 1
+uv run python -m scripts.evaluation.evaluate labels --horizon 1M --k 0.5 1 1.5 2
 
 # 2. predictions (container behind the proxy; resumable, see below)
 docker compose --profile backtest build backtest-worker   # after any change in src/
 docker compose --profile backtest run --rm backtest-worker \
     uv run --no-sync python -m scripts.evaluation.evaluate predict --run-id r1 [--limit 5]
 
-# 3. metrics (host)
+# 3. metrics (host; reads the files, no database)
 uv run python -m scripts.evaluation.evaluate metrics \
     --predictions ../datalake/evaluation/predictions_r1.jsonl --k 0.5 1 1.5 2
 ```
@@ -249,8 +251,11 @@ Notes:
   sample is tried 3 times.
 - The proxy must be running with an allowlist matching the region in `.env`
   (§3.2). Start with `--limit 5` to check the whole path before a full run.
-- `metrics` rebuilds the labels from the database for each `k`, so it needs the
-  same prices that were used for the labels file.
+- `metrics` reads `labels_<horizon>_k<k>.jsonl` for every `k` it is asked for
+  and does not touch the database, so the result depends only on the two files
+  and can be recomputed anywhere. A missing labels file stops it with the
+  command that creates it. Predictions without a label are counted and ignored.
+  The result is printed and saved to `metrics_<run_id>.json`.
 
 ### 4.4 Reproducibility and run-to-run variance
 
