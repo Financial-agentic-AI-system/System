@@ -127,3 +127,35 @@ uv run python -m src.db.load --datalake ../Datalake --no-init # custom path, ski
 uv run python -m src.db.load --datasets articles              # (re)load articles + embed new ones
 uv run python -m src.db.load --no-embed                       # skip the embedding step
 ```
+
+## Backtest evaluation
+
+Measures how often the debate's BUY/HOLD/SELL matches the Triple Barrier label
+of the real price path. Method, sample grid and limitations:
+[docs/evaluation.md](docs/evaluation.md). Labels, predictions and metrics are
+written to `datalake/evaluation`.
+
+Prerequisites: the datalake loaded into Postgres (see above, including the
+article embeddings), `.env` with `GCP_PROJECT_ID` and `GCP_LOCATION` (the region
+must match `docker/backtest-proxy/squid.conf`) and
+`gcloud auth application-default login`. Run everything from this directory.
+
+```bash
+# 0. services
+docker compose up -d postgres redis
+
+# 1. labels: 10 tickers x 19 monthly dates, horizon 1M (no LLM, one file per k)
+uv run python -m scripts.evaluation.evaluate labels --horizon 1M --k 1
+
+# 2. rebuild the worker image (src/ is baked into it; needed after any change in src/)
+docker compose --profile backtest build backtest-worker
+
+# 3. predictions: the debates, behind the allowlisting proxy.
+#    Try 5 samples first, then run it again without --limit. The same --run-id resumes.
+docker compose --profile backtest run --rm backtest-worker uv run --no-sync python -m scripts.evaluation.evaluate predict --run-id r1 --limit 5
+docker compose --profile backtest run --rm backtest-worker uv run --no-sync python -m scripts.evaluation.evaluate predict --run-id r1
+
+# 4. metrics: reads the predictions and the labels files, prints and saves metrics_r1.json
+uv run python -m scripts.evaluation.evaluate metrics --predictions ../datalake/evaluation/predictions_r1.jsonl --k 1
+```
+
