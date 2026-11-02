@@ -223,8 +223,9 @@ datalake/evaluation/
 ```
 
 The folder is set by `EVALUATION_DIR` (default `../datalake/evaluation`; in the
-container `/datalake/evaluation`, mounted writable inside the otherwise
-read-only `/datalake`).
+container `/datalake/evaluation`, mounted writable; it is the only part of the
+datalake mounted in `backtest-worker`, so the raw files with post-`as_of` data
+are not in the container at all).
 
 ```bash
 # 1. labels (host, needs Postgres with prices); one file per k

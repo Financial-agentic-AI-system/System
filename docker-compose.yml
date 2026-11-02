@@ -91,10 +91,11 @@ services:
       dockerfile: docker/Dockerfile.worker
     profiles: ["backtest"]
     volumes:
-      - ../datalake:/datalake:ro
       - ./.env:/app/.env
       - ./scripts:/app/scripts
-      # Writable child mount over the read-only /datalake: labels and predictions.
+      # Only datalake/evaluation (labels, predictions), writable. The raw
+      # datalake is deliberately NOT mounted: the debate reads only Postgres,
+      # so raw files with post-as_of data have no reason to be in this container.
       - ../datalake/evaluation:/datalake/evaluation
       - ${APPDATA}/gcloud:/root/.config/gcloud:ro
     environment:
