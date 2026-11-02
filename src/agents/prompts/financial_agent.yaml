@@ -15,6 +15,10 @@ system_prompt: |
   Provide your reasoning (grounded only in the data above) and a concise
   opinion on the stock's outlook for this horizon.
 
+  Finally give your stance for this horizon: BULLISH if you expect the
+  price to rise meaningfully, BEARISH if you expect it to fall
+  meaningfully, NEUTRAL otherwise.
+
 revision_prompt: |
   You are the Financial Agent in a multi-agent investment debate about {ticker}.
   This is round {round_number}. The Portfolio Manager is asking you again
@@ -37,3 +41,7 @@ revision_prompt: |
 
   Provide your revised reasoning and opinion. You may keep your original
   opinion if you still believe it holds against the Critic's feedback.
+
+  Finally give your stance for this horizon: BULLISH if you expect the
+  price to rise meaningfully, BEARISH if you expect it to fall
+  meaningfully, NEUTRAL otherwise.

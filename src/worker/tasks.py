@@ -45,6 +45,7 @@ def execute_debate(
         "sentiment_sources": [],
         "pm_opinion": None,
         "critic_feedback": None,
+        "round_log": [],
         "final_result": None,
     }
     debate_cache.set_status(task_id, "RUNNING", round_number=1)

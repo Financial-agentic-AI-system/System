@@ -16,6 +16,7 @@ from src.agents.state import (
     NextAgentsSelection,
     PMOpinion,
     PredictResult,
+    RoundLog,
 )
 from src.agents.tools import SEARCH_ARTICLES_TOOL, extract_queries
 from src.agents.volatility import (
@@ -417,7 +418,19 @@ def critic_node(state: DebateState) -> dict:
         macro_report=format_report(state["macro_report"]),
     )
     feedback = llm_client.generate_structured(prompt, CriticFeedback)
-    return {"critic_feedback": feedback}
+    # The Critic runs exactly once per round, after the PM, so this is where
+    # the round's reports and the PM's call are all in the state.
+    entry = RoundLog(
+        round_number=state["round_number"],
+        active_agents=list(state["active_agents"]),
+        stances={
+            name: state[f"{name}_report"].stance
+            for name in ("financial", "sentiment", "macro")
+        },
+        pm_direction=state["pm_opinion"].direction,
+        pm_confidence=state["pm_opinion"].confidence,
+    )
+    return {"critic_feedback": feedback, "round_log": [entry]}
 
 
 # --------------------------------------------------------------------------- #
@@ -437,5 +450,6 @@ def finalize_node(state: DebateState) -> dict:
                 sentiment=state["sentiment_report"],
                 macro=state["macro_report"],
             ),
+            round_log=state["round_log"],
         )
     }

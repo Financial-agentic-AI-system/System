@@ -13,6 +13,7 @@ from typing import Annotated, Literal, TypedDict
 from pydantic import BaseModel, Field
 
 Direction = Literal["BUY", "HOLD", "SELL"]
+Stance = Literal["BULLISH", "NEUTRAL", "BEARISH"]
 
 MAX_ROUNDS = 3
 
@@ -20,6 +21,9 @@ MAX_ROUNDS = 3
 class AgentReport(BaseModel):
     reasoning: str
     opinion: str
+    # Last, so the model reasons before it commits. No default on purpose: a
+    # skipped field must fail validation, not silently become NEUTRAL.
+    stance: Stance
 
 
 class PMOpinion(BaseModel):
@@ -46,6 +50,25 @@ class AgentReports(BaseModel):
     macro: AgentReport
 
 
+class RoundLog(BaseModel):
+    """One debate round as seen by the Critic: who was asked, each agent's
+    stance and the PM's call. Written by `critic_node`, used by the backtest.
+
+    No Critic verdict here: every round but the last ended with a disagreement
+    (that is why the debate went on), and the last one is
+    `PredictResult.critic_agreed`.
+
+    `stances` holds all three agents; the ones not in `active_agents` keep
+    their stance from an earlier round.
+    """
+
+    round_number: int
+    active_agents: list[str]
+    stances: dict[str, Stance]
+    pm_direction: Direction
+    pm_confidence: float
+
+
 class PredictResult(BaseModel):
     direction: Direction
     confidence: float = Field(ge=0.0, le=1.0)
@@ -53,6 +76,7 @@ class PredictResult(BaseModel):
     rounds_used: int
     critic_agreed: bool
     agent_reports: AgentReports
+    round_log: list[RoundLog] = []
 
 
 class ArticleSource(TypedDict):
@@ -84,4 +108,5 @@ class DebateState(TypedDict):
 
     pm_opinion: PMOpinion | None
     critic_feedback: CriticFeedback | None
+    round_log: Annotated[list[RoundLog], operator.add]
     final_result: PredictResult | None

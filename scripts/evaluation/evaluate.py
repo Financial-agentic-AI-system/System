@@ -78,6 +78,11 @@ def run_one(sample: Sample, attempts: int = 3) -> dict:
                 "confidence": res.confidence,
                 "rounds_used": res.rounds_used,
                 "critic_agreed": res.critic_agreed,
+                # The PM's round-1 call, before any Critic feedback.
+                "first_direction": (
+                    res.round_log[0].pm_direction if res.round_log else None
+                ),
+                "round_log": [r.model_dump() for r in res.round_log],
                 "error": None,
             }
         except Exception as exc:

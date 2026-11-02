@@ -11,6 +11,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 Direction = Literal["BUY", "HOLD", "SELL"]
+Stance = Literal["BULLISH", "NEUTRAL", "BEARISH"]
 StatusValue = Literal["PENDING", "RUNNING", "DONE", "FAILED"]
 AgentName = Literal["financial", "sentiment", "macro"]
 
@@ -28,6 +29,7 @@ class ApiError(RuntimeError):
 class AgentReport(BaseModel):
     reasoning: str
     opinion: str
+    stance: Stance | None = None  # None: a result cached before the field existed
 
 
 class AgentReports(BaseModel):
@@ -48,6 +50,14 @@ class CriticFeedback(BaseModel):
     agree: bool
 
 
+class RoundLog(BaseModel):
+    round_number: int
+    active_agents: list[str]
+    stances: dict[str, Stance]
+    pm_direction: Direction
+    pm_confidence: float
+
+
 class PredictResult(BaseModel):
     direction: Direction
     confidence: float = Field(ge=0.0, le=1.0)
@@ -55,6 +65,7 @@ class PredictResult(BaseModel):
     rounds_used: int
     critic_agreed: bool
     agent_reports: AgentReports
+    round_log: list[RoundLog] = []
 
 
 class DebateStatus(BaseModel):

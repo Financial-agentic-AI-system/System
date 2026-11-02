@@ -59,6 +59,10 @@ system_prompt: |
   opinion on how sentiment is likely to affect the stock's outlook for this
   horizon.
 
+  Finally give your stance for this horizon: BULLISH if you expect the
+  price to rise meaningfully, BEARISH if you expect it to fall
+  meaningfully, NEUTRAL otherwise.
+
 revision_prompt: |
   You are the Sentiment Agent in a multi-agent investment debate about {ticker}.
   This is round {round_number}. The Portfolio Manager is asking you again
@@ -77,3 +81,7 @@ revision_prompt: |
   {extra_section}
   Provide your revised reasoning and opinion. You may keep your original
   opinion if you still believe it holds against the Critic's feedback.
+
+  Finally give your stance for this horizon: BULLISH if you expect the
+  price to rise meaningfully, BEARISH if you expect it to fall
+  meaningfully, NEUTRAL otherwise.

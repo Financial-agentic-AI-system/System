@@ -217,7 +217,9 @@ Labels and predictions are files in the datalake repository, next to
 ```
 datalake/evaluation/
   labels_1M_k<k>.jsonl           one file per k; one row per sample: p0, sigma_h, barriers, label, touch_date, ret_end
-  predictions_<run_id>.jsonl     one row per debate: direction, confidence, rounds, error
+  predictions_<run_id>.jsonl     one row per debate: direction, confidence, rounds, error,
+                                 first_direction (PM's round-1 call), round_log (per round:
+                                 agents asked, each agent's stance, PM's direction/confidence)
   predictions_<run_id>.meta.json model version, prompts hash, labels file, sample count
   metrics_<run_id>.json          result of `metrics` for every k (accuracy, baseline, confusion, calibration)
 ```

@@ -135,11 +135,16 @@ agent nodes. Proposed shape (Pydantic pair per CLAUDE.md convention:
     "summary": "...",            // PM's final synthesized rationale
     "rounds_used": 2,            // 1-3
     "critic_agreed": true,
-    "agent_reports": {
-      "financial": {"opinion": "...", "reasoning": "..."},
-      "sentiment": {"opinion": "...", "reasoning": "..."},
-      "macro":     {"opinion": "...", "reasoning": "..."}
-    }
+    "agent_reports": {           // stance: BULLISH | NEUTRAL | BEARISH
+      "financial": {"opinion": "...", "reasoning": "...", "stance": "NEUTRAL"},
+      "sentiment": {"opinion": "...", "reasoning": "...", "stance": "BULLISH"},
+      "macro":     {"opinion": "...", "reasoning": "...", "stance": "NEUTRAL"}
+    },
+    "round_log": [               // one entry per round, written by the Critic node
+      {"round_number": 1, "active_agents": ["financial", "sentiment", "macro"],
+       "stances": {"financial": "NEUTRAL", "sentiment": "BULLISH", "macro": "NEUTRAL"},
+       "pm_direction": "BUY", "pm_confidence": 0.8}
+    ]
   },
   "created_at": "2024-03-15T10:00:00Z",
   "finished_at": "2024-03-15T10:02:31Z"
