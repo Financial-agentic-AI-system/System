@@ -18,6 +18,12 @@ from src.agents.state import (
     PredictResult,
 )
 from src.agents.tools import SEARCH_ARTICLES_TOOL, extract_queries
+from src.agents.volatility import (
+    HISTORY_SESSIONS,
+    HORIZON_LONG,
+    VOL_SPAN,
+    horizon_sigma,
+)
 from src.db.models import ArticleSummary, Fundamentals, MacroSeries, StockPrice
 from src.db.queries import (
     count_articles_without_embedding,
@@ -322,7 +328,28 @@ def macro_agent_node(state: DebateState) -> dict:
 # --------------------------------------------------------------------------- #
 # Portfolio Manager — two distinct jobs, two distinct prompts
 # --------------------------------------------------------------------------- #
+def _label_definition(state: DebateState) -> dict:
+    """Placeholders that tell the PM what BUY/HOLD/SELL mean for this stock.
+
+    HOLD = the price stays within one standard deviation (see volatility.py).
+    """
+    with get_session() as session:
+        prices = fetch_prices(
+            session, state["ticker"], state["as_of_date"], lookback_days=450
+        )
+    # Same truncation as the backtest labels (scripts/evaluation/labels.py).
+    closes_desc = [float(p.close) for p in prices[:HISTORY_SESSIONS]]
+    sigma = horizon_sigma(closes_desc, state["horizon"])
+    band = f"{sigma * 100:.1f}%" if sigma is not None else "its typical volatility"
+    return dict(
+        horizon_long=HORIZON_LONG[state["horizon"]],
+        band_pct=band,
+        vol_span=VOL_SPAN,
+    )
+
+
 def pm_synthesize_node(state: DebateState) -> dict:
+    label_definition = _label_definition(state)
     reports = dict(
         financial_report=format_report(state["financial_report"]),
         sentiment_report=format_report(state["sentiment_report"]),
@@ -336,6 +363,7 @@ def pm_synthesize_node(state: DebateState) -> dict:
             ticker=state["ticker"],
             horizon=state["horizon"],
             as_of_date=state["as_of_date"],
+            **label_definition,
             **reports,
         )
     else:
@@ -349,6 +377,7 @@ def pm_synthesize_node(state: DebateState) -> dict:
             critic_feedback=state["critic_feedback"].feedback,
             previous_opinion=format_opinion(state["pm_opinion"]),
             reasked_agents=", ".join(state["active_agents"]),
+            **label_definition,
             **reports,
         )
 

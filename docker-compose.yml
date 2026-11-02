@@ -91,11 +91,17 @@ services:
       dockerfile: docker/Dockerfile.worker
     profiles: ["backtest"]
     volumes:
-      - ../datalake:/datalake:ro
       - ./.env:/app/.env
+      - ./scripts:/app/scripts
+      # Only datalake/evaluation (labels, predictions), writable. The raw
+      # datalake is deliberately NOT mounted: the debate reads only Postgres,
+      # so raw files with post-as_of data have no reason to be in this container.
+      - ../datalake/evaluation:/datalake/evaluation
+      - ${APPDATA}/gcloud:/root/.config/gcloud:ro
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/mas_db
       - REDIS_URL=redis://redis:6379/0
+      - EVALUATION_DIR=/datalake/evaluation
       - HTTP_PROXY=http://backtest-proxy:8888
       - HTTPS_PROXY=http://backtest-proxy:8888
     networks:

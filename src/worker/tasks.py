@@ -1,10 +1,10 @@
 """Celery task that runs the LangGraph debate and mirrors its progress into
 src/cache/debate_cache.py.
 
-`_run_debate` is a plain function, deliberately separate from the `@app.task`
+`execute_debate` is a plain function, deliberately separate from the `@app.task`
 wrapper — testable without Celery at all (same split as graph.py/nodes.py
 already use for the graph itself). `run_debate` exists only to hand Celery's
-own task_id (`self.request.id`) to `_run_debate`, since that id is what
+own task_id (`self.request.id`) to `execute_debate`, since that id is what
 FastAPI/Streamlit will later use to key into debate_cache.
 
 Uses `.stream(state, stream_mode="updates")`, not `.invoke()` — see
@@ -29,7 +29,7 @@ from src.worker.celery_app import app
 logger = logging.getLogger(__name__)
 
 
-def _run_debate(
+def execute_debate(
     ticker: str, horizon: str, as_of_date: date, task_id: str
 ) -> PredictResult:
     initial_state: DebateState = {
@@ -99,5 +99,5 @@ def run_debate(self, ticker: str, horizon: str, as_of_date: date | str) -> dict:
     # (the API sends one on purpose); convert back before it reaches the graph.
     if isinstance(as_of_date, str):
         as_of_date = date.fromisoformat(as_of_date)
-    result = _run_debate(ticker, horizon, as_of_date, task_id=self.request.id)
+    result = execute_debate(ticker, horizon, as_of_date, task_id=self.request.id)
     return result.model_dump(mode="json")

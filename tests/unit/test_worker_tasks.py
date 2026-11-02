@@ -3,7 +3,7 @@ graph and mirrors its progress into src/cache/debate_cache.py.
 
 Combines fixtures already established elsewhere: `_no_real_db` and
 `_make_fake_llm` (tests/unit/test_agents_graph.py) and `_fake_redis`
-(tests/unit/test_debate_cache.py). Tests call `_run_debate` directly — no
+(tests/unit/test_debate_cache.py). Tests call `execute_debate` directly — no
 Celery machinery involved — except one test that goes through the
 `@app.task` wrapper via `.apply()`, to prove the wrapping itself works.
 """
@@ -91,7 +91,7 @@ def test_run_debate_happy_path_writes_done_status_result_and_history(monkeypatch
     fake_llm = _make_fake_llm(critic_agrees_after=0)
     monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
 
-    result = tasks._run_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+    result = tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
 
     assert result.direction == "BUY"
     assert result.rounds_used == 1
@@ -116,7 +116,7 @@ def test_run_debate_partial_reask_tags_round_2_entries(monkeypatch):
     fake_llm = _make_fake_llm(critic_agrees_after=1, selected_agents=["macro"])
     monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
 
-    result = tasks._run_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+    result = tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
 
     assert result.rounds_used == 2
 
@@ -144,7 +144,7 @@ def test_run_debate_marks_failed_on_exception_and_preserves_partial_history(
     monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
 
     with pytest.raises(RuntimeError):
-        tasks._run_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+        tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
 
     status = debate_cache.get_status("t1")
     assert status.status == "FAILED"
@@ -185,7 +185,7 @@ def test_run_debate_task_accepts_iso_string_date(monkeypatch):
 
         return _R()
 
-    monkeypatch.setattr(tasks, "_run_debate", fake_run)
+    monkeypatch.setattr(tasks, "execute_debate", fake_run)
 
     tasks.run_debate.apply(args=["AAPL", "1W", "2025-12-30"])
 
@@ -199,7 +199,7 @@ def test_run_debate_logs_a_summary(monkeypatch, caplog):
     fake_llm = _make_fake_llm(critic_agrees_after=0)
     monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
 
-    tasks._run_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+    tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
 
     assert "debate t1 AAPL 1W as of 2025-12-30 started" in caplog.text
     assert "debate t1 AAPL 1W as of 2025-12-30 done: BUY, confidence 60%" in caplog.text

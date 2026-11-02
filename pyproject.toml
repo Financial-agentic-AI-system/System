@@ -24,7 +24,8 @@ dependencies = [
     "yfinance",
     "click",
     "google-auth",  # ADC auth for src/agents/llm_client.py (MaaS REST calls)
-    "requests"      # src/agents/llm_client.py MaaS REST calls
+    "requests",     # src/agents/llm_client.py MaaS REST calls
+    "python-dateutil"  # relativedelta in scripts/evaluation/samples.py
 ]
 
 [project.optional-dependencies]

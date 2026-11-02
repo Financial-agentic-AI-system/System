@@ -62,7 +62,10 @@ debate protocol (round limit, termination condition), and
   secrets.
 - The datalake is read-only from this repo's point of view. Never write into
   `/datalake`; derived data (embeddings, metadata) goes into Postgres/pgvector
-  through `src/db/load.py`.
+  through `src/db/load.py`. The one exception is `datalake/evaluation`
+  (backtest labels, predictions, metrics — see `docs/evaluation.md` §4), which
+  `scripts/evaluation/` writes to; it is the only part of the datalake mounted
+  in `backtest-worker`. Labels must never go into Postgres or into a debate.
 
 ## Commands
 
