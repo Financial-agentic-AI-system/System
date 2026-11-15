@@ -1,17 +1,12 @@
 """Unit tests for frontend/api_client.py — HTTP is stubbed, no backend needed."""
 
-import sys
 from datetime import date
-from pathlib import Path
 
+import api_client
 import pytest
 import requests
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "frontend"))
-
-import api_client  # noqa: E402
-from api_client import BackendClient  # noqa: E402
-from models import ApiError  # noqa: E402
+from api_client import BackendClient
+from models import ApiError
 
 REPORT = {"opinion": "o", "reasoning": "r"}
 RESULT = {
@@ -133,13 +128,6 @@ def test_status_history_result_are_parsed(http):
     assert resp.as_of_date == date(2026, 1, 15)
 
 
-def test_unreachable_backend_raises_api_error(http):
-    queue, _ = http
-    queue.append(requests.ConnectionError("refused"))
-    with pytest.raises(ApiError, match="Cannot reach the backend"):
-        _client().status("abc")
-
-
 @pytest.mark.parametrize(
     ("response", "expected"),
     [
@@ -221,6 +209,6 @@ def test_api_error_carries_http_status(http):
         _client().status("abc")
     assert not_found.value.status_code == 404
 
-    with pytest.raises(ApiError) as unreachable:
+    with pytest.raises(ApiError, match="Cannot reach the backend") as unreachable:
         _client().status("abc")
     assert unreachable.value.status_code is None

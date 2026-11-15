@@ -34,10 +34,14 @@ def test_track_sums_calls_from_threads():
     assert "3 LLM call(s) (1 failed), 300 in / 30 out tokens" in debate.summary()
 
 
-def test_record_outside_track_only_logs(caplog):
+def test_log_lines_carry_the_debate_id_or_a_dash_outside_track(caplog):
     caplog.set_level(logging.INFO, logger="src.agents.usage")
     usage.record_call("generate_structured", {"prompt_tokens": 7}, 0.1, 1)
     assert "debate=- node=- generate_structured: 7 in / 0 out tokens" in caplog.text
+
+    with usage.track(debate_id="abc123"):
+        usage.record_call("generate_structured", {"prompt_tokens": 1}, 0.1, 1)
+    assert "llm call debate=abc123 node=- generate_structured" in caplog.text
 
 
 class _Answer(BaseModel):
@@ -92,13 +96,6 @@ def test_failed_llm_call_is_recorded(monkeypatch, caplog):
 
     assert (debate.calls, debate.failed_calls) == (0, 1)
     assert "FAILED after 1 attempt(s)" in caplog.text
-
-
-def test_lines_carry_the_debate_id(caplog):
-    caplog.set_level(logging.INFO, logger="src.agents.usage")
-    with usage.track(debate_id="abc123"):
-        usage.record_call("generate_structured", {"prompt_tokens": 1}, 0.1, 1)
-    assert "llm call debate=abc123 node=- generate_structured" in caplog.text
 
 
 def test_retries_are_logged_and_summed(monkeypatch, caplog):

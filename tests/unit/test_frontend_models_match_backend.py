@@ -1,19 +1,14 @@
 """The frontend keeps its own copy of the backend's response models (it does
 not ship `src/`). These tests fail when the two drift apart."""
 
-import sys
-from pathlib import Path
 from typing import get_args
 
+import models as frontend
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "frontend"))
-
-import models as frontend  # noqa: E402
-
-from src.agents import state  # noqa: E402
-from src.api.v1 import schemas  # noqa: E402
-from src.cache import schemas as cache  # noqa: E402
+from src.agents import state
+from src.api.v1 import schemas
+from src.cache import schemas as cache
 
 PAIRS = [
     (frontend.AgentReport, state.AgentReport),
@@ -37,9 +32,6 @@ def test_same_fields(frontend_model, backend_model):
     assert set(frontend_model.model_fields) == set(backend_model.model_fields)
 
 
-def test_same_directions():
+def test_same_directions_and_statuses():
     assert set(get_args(frontend.Direction)) == set(get_args(state.Direction))
-
-
-def test_same_statuses():
     assert set(get_args(frontend.StatusValue)) == set(get_args(cache.DebateStatusValue))

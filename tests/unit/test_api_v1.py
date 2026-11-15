@@ -1,4 +1,4 @@
-"""Unit tests for src/api/v1 — the 4 REST endpoints of docs/ARCHITECTURE.md §4.
+"""Unit tests for src/api/v1 — the REST endpoints of docs/ARCHITECTURE.md §4.
 
 No real Redis or broker: `debate_cache.redis_client` is a fakeredis instance
 and `celery_app.send_task` is replaced by a recorder. The cache is seeded
@@ -8,25 +8,19 @@ also pin down that the API reads exactly what the worker writes.
 
 from datetime import date, datetime, timedelta, timezone
 
-import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from kombu.exceptions import OperationalError
 
-from src.agents.state import AgentReport, AgentReports, PredictResult
+from src.agents.state import MAX_ROUNDS, AgentReport, AgentReports, PredictResult
 from src.api.v1.endpoints import predict
 from src.api.v1.main import app
 from src.cache import debate_cache
 from src.cache.schemas import TaskMeta
 
+pytestmark = pytest.mark.usefixtures("fake_redis")
+
 AS_OF = "2025-12-30"
-
-
-@pytest.fixture(autouse=True)
-def _fake_redis(monkeypatch):
-    fake = fakeredis.FakeRedis(decode_responses=True)
-    monkeypatch.setattr(debate_cache, "redis_client", fake)
-    return fake
 
 
 @pytest.fixture(autouse=True)
@@ -183,11 +177,12 @@ def test_start_returns_503_and_marks_failed_when_broker_is_down(
 # --------------------------------------------------------------------------- #
 # GET /debate_status/{task_id}
 # --------------------------------------------------------------------------- #
-def test_debate_status_unknown_task_is_404(client):
-    assert client.get("/api/v1/debate_status/nope").status_code == 404
+@pytest.mark.parametrize("endpoint", ["debate_status", "history", "predict/result"])
+def test_unknown_task_is_404(client, endpoint):
+    assert client.get(f"/api/v1/{endpoint}/nope").status_code == 404
 
 
-def test_debate_status_returns_cached_status(client):
+def test_debate_status_returns_cached_status_and_round_limit(client):
     debate_cache.set_status("t1", "RUNNING", round_number=2, current_node="macro")
 
     body = client.get("/api/v1/debate_status/t1").json()
@@ -196,21 +191,16 @@ def test_debate_status_returns_cached_status(client):
     assert body["round_number"] == 2
     assert body["current_node"] == "macro"
     assert body["error"] is None
+    assert body["max_rounds"] == MAX_ROUNDS
 
 
 # --------------------------------------------------------------------------- #
 # GET /history/{task_id}
 # --------------------------------------------------------------------------- #
-def test_history_unknown_task_is_404(client):
-    assert client.get("/api/v1/history/nope").status_code == 404
-
-
-def test_history_empty_for_queued_task(client):
+def test_history_is_empty_when_queued_then_returns_entries_in_order(client):
     debate_cache.set_status("t1", "PENDING", round_number=1)
     assert client.get("/api/v1/history/t1").json() == {"task_id": "t1", "history": []}
 
-
-def test_history_returns_entries_in_order(client):
     debate_cache.set_status("t1", "RUNNING", round_number=2)
     debate_cache.append_history(
         "t1",
@@ -233,10 +223,6 @@ def test_history_returns_entries_in_order(client):
 # --------------------------------------------------------------------------- #
 # GET /predict/result/{task_id}
 # --------------------------------------------------------------------------- #
-def test_result_unknown_task_is_404(client):
-    assert client.get("/api/v1/predict/result/nope").status_code == 404
-
-
 def test_result_without_meta_is_404(client):
     """A task the API never accepted (no request metadata) has no envelope."""
     debate_cache.set_status("t1", "RUNNING", round_number=1)
@@ -350,52 +336,33 @@ def test_fetch_tickers_query():
 
 
 # --------------------------------------------------------------------------- #
-# GET /meta and max_rounds in /debate_status
+# GET /meta
 # --------------------------------------------------------------------------- #
-def _meta(client, monkeypatch, first, last):
+@pytest.mark.parametrize(
+    ("first", "last", "start", "end"),
+    [
+        # prices older than the backtest window: the start is clamped to it
+        (date(2010, 1, 4), date(2026, 9, 30), "2025-01-01", "2026-09-30"),
+        # the window follows the prices in the database
+        (date(2025, 3, 3), date(2026, 12, 31), "2025-03-03", "2026-12-31"),
+        # no prices at all: the configured defaults
+        (None, None, "2025-01-01", "2026-06-30"),
+    ],
+)
+def test_meta_exposes_backend_settings(client, monkeypatch, first, last, start, end):
     from contextlib import nullcontext
 
     from src.api.v1.endpoints import meta
 
     monkeypatch.setattr(meta, "get_session", lambda: nullcontext())
     monkeypatch.setattr(meta, "fetch_price_date_range", lambda session: (first, last))
-    return client.get("/api/v1/meta")
 
-
-def test_meta_exposes_backend_settings(client, monkeypatch):
-    from src.agents.state import MAX_ROUNDS
-
-    resp = _meta(client, monkeypatch, date(2010, 1, 4), date(2026, 9, 30))
+    resp = client.get("/api/v1/meta")
 
     assert resp.status_code == 200
     assert resp.json() == {
         "horizons": ["1W", "1M", "3M"],
-        "backtest_start": "2025-01-01",
-        "backtest_end": "2026-09-30",
+        "backtest_start": start,
+        "backtest_end": end,
         "max_rounds": MAX_ROUNDS,
     }
-
-
-def test_meta_window_follows_prices_in_db(client, monkeypatch):
-    body = _meta(client, monkeypatch, date(2025, 3, 3), date(2026, 12, 31)).json()
-    assert (body["backtest_start"], body["backtest_end"]) == (
-        "2025-03-03",
-        "2026-12-31",
-    )
-
-
-def test_meta_falls_back_without_prices(client, monkeypatch):
-    body = _meta(client, monkeypatch, None, None).json()
-    assert (body["backtest_start"], body["backtest_end"]) == (
-        "2025-01-01",
-        "2026-06-30",
-    )
-
-
-def test_debate_status_carries_round_limit(client):
-    from src.agents.graph import MAX_ROUNDS as GRAPH_LIMIT
-
-    _seed()
-    debate_cache.set_status("t1", "RUNNING", round_number=2)
-
-    assert client.get("/api/v1/debate_status/t1").json()["max_rounds"] == GRAPH_LIMIT
