@@ -41,7 +41,7 @@ dev = [
     "ruff>=0.3.0",
     "pre-commit>=3.0.0",
     "fakeredis>=2.20.0",
-    "httpx",  # fastapi.testclient (tests/unit/test_api_v1.py)
+    "httpx2>=2.16.2",  # fastapi.testclient (tests/unit/test_api_v1.py)
     "pytest-cov>=7.1.0",
 ]
 # Everything the frontend container needs; it does not ship src/.
