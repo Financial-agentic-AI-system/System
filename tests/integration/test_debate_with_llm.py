@@ -4,12 +4,12 @@ Nothing is replaced: a small datalake is written to disk and loaded with the
 real loaders, the articles are embedded with the real embedding API (when the
 Sentiment agent's search is enabled), and every agent calls the real model.
 
-These tests cost tokens and need credentials, so they live outside the
-directories CI runs. Run them explicitly:
+These tests cost tokens and need credentials, so they are marked `llm` and
+deselected by default (`addopts` in pyproject.toml). Run them explicitly:
 
     docker compose up -d postgres redis
     gcloud auth application-default login   # once
-    uv run --env-file .env pytest tests/e2e
+    uv run --env-file .env pytest tests/integration -m llm
 
 Without `GCP_PROJECT_ID` (or `GEMINI_API_KEY`) they are skipped.
 
@@ -31,12 +31,15 @@ from src.cache import debate_cache
 from src.db.article_embeddings import embed_article_summaries
 from src.db.loaders import load_all
 from src.worker import tasks
-from tests.conftest import trading_days
+from tests.integration.conftest import trading_days
 
-pytestmark = pytest.mark.skipif(
-    not (llm_client._PROJECT_ID or llm_client._API_KEY),
-    reason="no LLM credentials: run with `uv run --env-file .env pytest tests/e2e`",
-)
+pytestmark = [
+    pytest.mark.llm,
+    pytest.mark.skipif(
+        not (llm_client._PROJECT_ID or llm_client._API_KEY),
+        reason="no LLM credentials: run with `uv run --env-file .env pytest -m llm`",
+    ),
+]
 
 TICKER = "ACME"  # fictional, so the model cannot know how it went on
 AS_OF = date(2025, 6, 2)

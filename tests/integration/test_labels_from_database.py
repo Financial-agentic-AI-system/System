@@ -17,7 +17,7 @@ from scripts.evaluation.samples import Sample
 from src.agents import llm_client, nodes
 from src.agents.state import PMOpinion
 from src.agents.volatility import HISTORY_SESSIONS, HORIZON_SESSIONS, VOL_SPAN
-from tests.conftest import trading_days
+from tests.integration.conftest import trading_days
 
 # 400 weekdays (80 weeks) ending on Friday 2024-12-27.
 HISTORY_DAYS = trading_days(date(2023, 6, 19), 400)
