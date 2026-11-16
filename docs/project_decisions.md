@@ -98,3 +98,22 @@ the backtest proxy allowlist moved there from `us-central1`.
 last price: `backtest_end` is now the last date in `stock_prices`, so an
 analysis can use all loaded data. For evaluation the last scorable date is
 chosen by hand (last price minus the horizon).
+
+## 2026-11-16 — Tests: real services in integration tests, the LLM scripted in CI
+
+- **Integration tests run on a real Postgres (pgvector) and Redis**, not on
+  stand-ins: point-in-time bounds, upserts, labels and the frontend–backend
+  contract depend on what the database and the wire actually do, which a mock
+  only restates. CI starts them as service containers. The tests use their own
+  database, whose name must end in `_test`, because every test empties all
+  tables.
+- **The LLM is scripted in CI.** Real calls cost tokens, need credentials and
+  are not deterministic, so a CI run would be flaky. Tests on the real LLM are
+  marked `llm`, deselected by default and run by hand (`-m llm`); they check
+  the shape and invariants of a debate, never the opinions.
+- **The frontend–backend contract is checked by a round trip**, not by
+  comparing model fields: responses fetched from the running API must survive
+  the frontend models unchanged.
+- **Coverage is reported, not enforced.** No minimum: the total includes the
+  Streamlit views, which have no unit tests by design, so a threshold would
+  mostly measure that.

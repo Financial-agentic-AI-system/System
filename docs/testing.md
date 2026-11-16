@@ -135,7 +135,6 @@ imported by bare name, as they are inside the frontend container.
 | --- | --- |
 | `test_frontend_api_client.py` | The REST client: request bodies, response parsing, readable errors for 404/422/503/500, an unreachable backend and unexpected response shapes. |
 | `test_frontend_debate_model.py` | Grouping the history into rounds, the per-stage state shown in the live view, the progress message for each phase of a debate. |
-| `test_frontend_models_match_backend.py` | The frontend's copy of the response models has the same fields, directions and statuses as the backend's. |
 
 ## 4. Integration tests
 
