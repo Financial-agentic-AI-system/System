@@ -20,12 +20,11 @@ deselected unless asked for (`addopts = "-v -m 'not llm'"`).
 uv run pytest tests/unit
 ```
 
-Coverage (line and branch) can be measured without adding a dependency to the
-project:
+Coverage (line and branch, of `src/`, `scripts/` and `frontend/`; settings in
+`[tool.coverage.run]` of `pyproject.toml`):
 
 ```bash
-uv run --with pytest-cov pytest tests/unit \
-    --cov=src --cov=scripts --cov=frontend --cov-branch --cov-report=term-missing
+uv run pytest tests/unit --cov --cov-report=term-missing
 ```
 
 Integration tests need Postgres with pgvector and Redis, e.g. the services from
@@ -56,10 +55,16 @@ Redis uses its own logical database and flushes only that one. When a service
 cannot be reached the tests are skipped, or fail when the `CI` environment
 variable is set.
 
-CI (`.github/workflows/unit-tests.yaml`) runs the unit tests on every push and
-pull request to `main`. A second job checks that the backend, the worker and
-the frontend import with only the dependency groups their Docker images
-install.
+CI (`.github/workflows/unit-tests.yaml`) runs on every push and pull request to
+`main`, in three jobs:
+
+- `test` — the unit tests.
+- `integration-tests` — unit and integration tests together, against
+  `pgvector/pgvector:pg16` and `redis:7-alpine` service containers, with
+  coverage of both; the report is printed in the log and in the run's summary.
+  Tests marked `llm` are not run.
+- `image-dependencies` — the backend, the worker and the frontend import with
+  only the dependency groups their Docker images install.
 
 ## 2. How external services are replaced
 
@@ -69,7 +74,7 @@ install.
 | Postgres (reads) | `get_session` and the `fetch_*` queries patched to return no rows or canned rows |
 | Postgres (SQL shape) | statements compiled with the PostgreSQL dialect and checked as text (`WHERE`, `ORDER BY`, `ON CONFLICT … DO UPDATE`) |
 | Celery broker | `celery_app.send_task` replaced by a recorder; the task itself runs eagerly through `.apply()` |
-| LLM | `llm_client.generate_structured` / `generate_tool_calls` replaced by scripted fakes; HTTP-level tests patch `requests.post` |
+| LLM | `llm_client.generate_structured` / `generate_tool_calls` replaced by scripted fakes; the client itself is tested against a scripted HTTP server on localhost |
 | Embedding API, Google auth | `requests.post` and `google.auth.default` patched with fake responses and credentials |
 | Backend (for the frontend) | `requests.request` / `requests.get` patched with queued responses |
 
@@ -97,7 +102,7 @@ imported by bare name, as they are inside the frontend container.
 | `test_agents_graph.py` | The compiled debate graph end to end with a scripted LLM: termination after round 1 when the Critic agrees, a partial re-ask of only the agents the PM selects, the stop at the round limit when the Critic keeps disagreeing; `route_to_agents` creates one `Send` per active agent. |
 | `test_agents_nodes.py` | Context formatters (fundamentals, macro trend, reports, PM opinion); which prompt key each node picks in round 1 and in later rounds, and what it passes into it; the PM's HOLD band from price volatility; `finalize_node` assembling `PredictResult`; `horizon_sigma` scaling with √sessions and `ewm_std` matching pandas `ewm(span).std()`. |
 | `test_prompt_loader.py` | Placeholder substitution, the default `system_prompt` key, clear errors for a missing key, a missing placeholder or an unknown prompt file, YAML caching. |
-| `test_llm_client.py` | Parsing of structured answers, including Llama 4 answers wrapped as a function call. |
+| `test_llm_client.py` | Parsing of structured answers, including Llama 4 answers wrapped as a function call. Against a scripted HTTP server on localhost: the request body (schema, temperature 0, no tools on structured calls), retries of server errors, dropped connections, non-JSON bodies and answers that miss the schema with `2 ** attempt` waits, `Retry-After` and the longer backoff on 429, no retry on 400/401/403/404, giving up after 5 attempts, tool calls parsed and malformed ones skipped. |
 | `test_usage.py` | Token and cost accounting per debate (also across LangGraph's worker threads), log lines with the debate id, recording of successful, failed and retried LLM calls. |
 
 ### API, cache and worker
@@ -144,4 +149,5 @@ and loads them with `src/db/loaders.py`).
 | `test_frontend_backend.py` | The frontend's `BackendClient` against the FastAPI app served by uvicorn: tickers and the backtest window from the database, a debate started through the API and run by a Celery worker over Redis (the Critic disagrees once, so round 2 re-asks only Macro), status, history and result read back and turned into rounds by `debate_model`. Every response is also fetched raw and must survive the frontend models unchanged. Backend errors (unknown ticker, future date, unknown task) reach the frontend as `ApiError`. The LLM answers from a script. |
 | `test_debate_with_llm.py` (`llm`) | A fictional company written as datalake files and loaded with the real loaders (fundamentals, prices, FRED series, articles, one of them published after `as_of_date`); the articles are embedded with the real embedding API. The Financial agent answers from the database with one real LLM call; a full debate on the real LLM ends `DONE` with valid values, the protocol order in the Redis history, and no article from after `as_of_date` among the Sentiment agent's search results. Opinions are never checked, since the model is not deterministic. |
 | `test_point_in_time.py` | The point-in-time bounds of `src/db/queries.py` on a loaded datalake, day by day around each boundary: a report is visible from its `reported_date`, or from 90 days after its fiscal date when the date is missing, and `quarters` keeps the newest published quarters with all three statements; prices and macro values up to and including `as_of_date`; articles published until the end of `as_of_date` and never later, for recent articles, articles re-read by id, the count of missing vectors and the pgvector similarity search (also never another ticker's). |
+| `test_loading.py` | Loading the datalake twice with the real loaders: no duplicate rows and changed values updated; article vectors kept on reload, the title+summary vector reset when the title changed, both when the summary changed, and the next embedding run sends only the reset ones. |
 | `test_labels_from_database.py` | `build_labels` on prices loaded into Postgres: p0 is the close on `as_of` (or the last one before a weekend `as_of`), the path starts on the next session, the first barrier touched decides, a move after the vertical barrier is ignored, wider `k` turns a touch into HOLD, samples without enough prices are skipped with a reason. `sigma_h` is checked against pandas on the closes in calendar order, and the Portfolio Manager's prompt quotes the same band from the agents' own price query. |

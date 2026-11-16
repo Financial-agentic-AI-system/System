@@ -10,6 +10,20 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: mas_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U user" --health-interval 5s --health-retries 10
+      redis:
+       image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -29,9 +43,9 @@ jobs:
         uv venv
         uv sync
 
-    - name: Run unit tests
+    - name: Run tests
       run: |
-        uv run pytest tests/unit
+        uv run pytest tests --cov --cov-report=term-missing
 
   # The Docker images install only some dependency groups. These checks fail
   # when code imports a package that lives in a group the image skips.

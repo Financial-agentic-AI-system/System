@@ -41,7 +41,8 @@ dev = [
     "ruff>=0.3.0",
     "pre-commit>=3.0.0",
     "fakeredis>=2.20.0",
-    "httpx"  # fastapi.testclient (tests/unit/test_api_v1.py)
+    "httpx",  # fastapi.testclient (tests/unit/test_api_v1.py)
+    "pytest-cov>=7.1.0",
 ]
 # Everything the frontend container needs; it does not ship src/.
 frontend = [
@@ -63,6 +64,11 @@ addopts = "-v -m 'not llm'"
 markers = [
     "llm: calls the real LLM and embedding API; deselected unless run with -m llm",
 ]
+
+# Coverage (`pytest --cov`): line and branch coverage of the project code.
+[tool.coverage.run]
+source = ["src", "scripts", "frontend"]
+branch = true
 
 # Ruff linter and formatter configuration
 [tool.ruff]
