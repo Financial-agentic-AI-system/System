@@ -1,18 +1,18 @@
 # Testing
 
-The repository has three kinds of tests:
+The repository has two kinds of tests:
 
 - **Unit tests** — `tests/unit/`, run by pytest locally and in CI. They need
   no running service: no Postgres, no Redis, no Celery broker, no LLM and no
   embedding API.
-- **Integration tests** — the pytest files in `tests/integration/`. They run
-  against a real Postgres with pgvector and a real Redis and check real
-  objects end to end; the LLM is the only stand-in.
-- **Smoke scripts** — the remaining scripts in `tests/integration/`, run by
-  hand against a real database and a real LLM.
+- **Integration tests** — `tests/integration/`. They run against a real
+  Postgres with pgvector and a real Redis and check real objects end to end.
+  Most of them script the LLM's answers; the ones marked `llm` call the real
+  LLM and embedding API.
 
 Plain `uv run pytest` collects only the unit tests
-(`testpaths = ["tests/unit"]` in `pyproject.toml`).
+(`testpaths = ["tests/unit"]` in `pyproject.toml`), and tests marked `llm` are
+deselected unless asked for (`addopts = "-v -m 'not llm'"`).
 
 ## 1. Running
 
@@ -40,6 +40,15 @@ uv run pytest tests/integration
 | --- | --- |
 | `TEST_DATABASE_URL` | `postgresql://user:password@localhost:5432/mas_test` |
 | `TEST_REDIS_URL` | `redis://localhost:6379/15` |
+
+Tests marked `llm` cost tokens and need the credentials from `.env` (see
+`.env.example`) plus Application Default Credentials
+(`gcloud auth application-default login`). They are skipped without
+`GCP_PROJECT_ID` or `GEMINI_API_KEY`:
+
+```bash
+uv run --env-file .env pytest tests/integration -m llm
+```
 
 The database name must end in `_test` (every test empties all tables, so the
 application database `mas_db` is never touched); it is created on first use.
@@ -133,17 +142,5 @@ and loads them with `src/db/loaders.py`).
 | File | What it checks |
 | --- | --- |
 | `test_frontend_backend.py` | The frontend's `BackendClient` against the FastAPI app served by uvicorn: tickers and the backtest window from the database, a debate started through the API and run by a Celery worker over Redis (the Critic disagrees once, so round 2 re-asks only Macro), status, history and result read back and turned into rounds by `debate_model`. Every response is also fetched raw and must survive the frontend models unchanged. Backend errors (unknown ticker, future date, unknown task) reach the frontend as `ApiError`. The LLM answers from a script. |
+| `test_debate_with_llm.py` (`llm`) | A fictional company written as datalake files and loaded with the real loaders (fundamentals, prices, FRED series, articles, one of them published after `as_of_date`); the articles are embedded with the real embedding API. The Financial agent answers from the database with one real LLM call; a full debate on the real LLM ends `DONE` with valid values, the protocol order in the Redis history, and no article from after `as_of_date` among the Sentiment agent's search results. Opinions are never checked, since the model is not deterministic. |
 | `test_labels_from_database.py` | `build_labels` on prices loaded into Postgres: p0 is the close on `as_of` (or the last one before a weekend `as_of`), the path starts on the next session, the first barrier touched decides, a move after the vertical barrier is ignored, wider `k` turns a touch into HOLD, samples without enough prices are skipped with a reason. `sigma_h` is checked against pandas on the closes in calendar order, and the Portfolio Manager's prompt quotes the same band from the agents' own price query. |
-
-## 5. Smoke scripts
-
-The scripts below call the real services and cost LLM tokens.
-Each needs credentials in `.env` (see `.env.example`); the two that read the
-database also need Postgres running with the datalake loaded
-(`uv run python -m src.db.load`). Usage is in each script's docstring.
-
-| Script | What it runs |
-| --- | --- |
-| `test_llm_client.py` | A few real calls to the LLM endpoint: authentication, structured output, same answer twice at temperature 0. |
-| `test_agent_db_integration.py` | One agent node (Financial) on real database rows and a real LLM call. |
-| `test_full_debate.py` | The full compiled debate graph on real data and a real LLM. |
