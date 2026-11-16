@@ -1,13 +1,18 @@
 # Testing
 
-The repository has two kinds of tests:
+The repository has three kinds of tests:
 
 - **Unit tests** — `tests/unit/`, run by pytest locally and in CI. They need
   no running service: no Postgres, no Redis, no Celery broker, no LLM and no
   embedding API.
-- **Integration smoke tests** — `tests/integration/`, plain scripts run by hand
-  against a real database and a real LLM. They are not collected by pytest
-  (`testpaths = ["tests/unit"]` in `pyproject.toml`).
+- **Integration tests** — the pytest files in `tests/integration/`. They run
+  against a real Postgres with pgvector and a real Redis and check real
+  objects end to end; the LLM is the only stand-in.
+- **Smoke scripts** — the remaining scripts in `tests/integration/`, run by
+  hand against a real database and a real LLM.
+
+Plain `uv run pytest` collects only the unit tests
+(`testpaths = ["tests/unit"]` in `pyproject.toml`).
 
 ## 1. Running
 
@@ -22,6 +27,25 @@ project:
 uv run --with pytest-cov pytest tests/unit \
     --cov=src --cov=scripts --cov=frontend --cov-branch --cov-report=term-missing
 ```
+
+Integration tests need Postgres with pgvector and Redis, e.g. the services from
+`docker-compose.yml`:
+
+```bash
+docker compose up -d postgres redis
+uv run pytest tests/integration
+```
+
+| Variable | Default |
+| --- | --- |
+| `TEST_DATABASE_URL` | `postgresql://user:password@localhost:5432/mas_test` |
+| `TEST_REDIS_URL` | `redis://localhost:6379/15` |
+
+The database name must end in `_test` (every test empties all tables, so the
+application database `mas_db` is never touched); it is created on first use.
+Redis uses its own logical database and flushes only that one. When a service
+cannot be reached the tests are skipped, or fail when the `CI` environment
+variable is set.
 
 CI (`.github/workflows/unit-tests.yaml`) runs the unit tests on every push and
 pull request to `main`. A second job checks that the backend, the worker and
@@ -88,6 +112,7 @@ imported by bare name, as they are inside the frontend container.
 
 | File | What it checks |
 | --- | --- |
+| `test_evaluation_labels.py` | Triple Barrier: the first barrier touched decides, a touch exactly on a barrier and on the last session counts, HOLD at the vertical barrier, the width scales with `k`; `horizon_sigma` on newest-first closes equals pandas on calendar-ordered closes, and recent volatility dominates the band. |
 | `test_evaluation_cli.py` | `evaluate metrics`: joining predictions with the labels file, counting failed and unlabelled predictions, the saved metrics JSON, a clear error naming the missing labels file; compaction of the predictions file. |
 
 ### Frontend (`frontend/`)
@@ -98,9 +123,21 @@ imported by bare name, as they are inside the frontend container.
 | `test_frontend_debate_model.py` | Grouping the history into rounds, the per-stage state shown in the live view, the progress message for each phase of a debate. |
 | `test_frontend_models_match_backend.py` | The frontend's copy of the response models has the same fields, directions and statuses as the backend's. |
 
-## 4. Integration smoke tests
+## 4. Integration tests
 
-Scripts in `tests/integration/` call the real services and cost LLM tokens.
+Fixtures in `tests/integration/conftest.py`: `db_session` (the empty test
+database; production `get_session()` points at it too), `redis_db` (the debate
+cache on the test Redis) and `load_prices` (writes closes as a datalake file
+and loads them with `src/db/loaders.py`).
+
+| File | What it checks |
+| --- | --- |
+| `test_frontend_backend.py` | The frontend's `BackendClient` against the FastAPI app served by uvicorn: tickers and the backtest window from the database, a debate started through the API and run by a Celery worker over Redis (the Critic disagrees once, so round 2 re-asks only Macro), status, history and result read back and turned into rounds by `debate_model`. Every response is also fetched raw and must survive the frontend models unchanged. Backend errors (unknown ticker, future date, unknown task) reach the frontend as `ApiError`. The LLM answers from a script. |
+| `test_labels_from_database.py` | `build_labels` on prices loaded into Postgres: p0 is the close on `as_of` (or the last one before a weekend `as_of`), the path starts on the next session, the first barrier touched decides, a move after the vertical barrier is ignored, wider `k` turns a touch into HOLD, samples without enough prices are skipped with a reason. `sigma_h` is checked against pandas on the closes in calendar order, and the Portfolio Manager's prompt quotes the same band from the agents' own price query. |
+
+## 5. Smoke scripts
+
+The scripts below call the real services and cost LLM tokens.
 Each needs credentials in `.env` (see `.env.example`); the two that read the
 database also need Postgres running with the datalake loaded
 (`uv run python -m src.db.load`). Usage is in each script's docstring.
