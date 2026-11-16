@@ -28,7 +28,7 @@ from src.agents.state import MAX_ROUNDS
 from src.api.v1.main import app as api_app
 from src.worker import tasks  # noqa: F401  (registers run_debate on the app)
 from src.worker.celery_app import app as celery_app
-from tests.integration.conftest import TEST_REDIS_URL, trading_days
+from tests.conftest import TEST_REDIS_URL, trading_days
 
 AS_OF = date(2025, 12, 30)
 PRICE_DAYS = trading_days(date(2024, 6, 3), 400)  # 2024-06-03 .. 2025-12-12

@@ -108,9 +108,9 @@ chosen by hand (last price minus the horizon).
   database, whose name must end in `_test`, because every test empties all
   tables.
 - **The LLM is scripted in CI.** Real calls cost tokens, need credentials and
-  are not deterministic, so a CI run would be flaky. Tests on the real LLM are
-  marked `llm`, deselected by default and run by hand (`-m llm`); they check
-  the shape and invariants of a debate, never the opinions.
+  are not deterministic, so a CI run would be flaky. Tests on the real LLM live
+  in `tests/e2e/`, which CI does not run, and are run by hand; they check the
+  shape and invariants of a debate, never the opinions.
 - **The frontend–backend contract is checked by a round trip**, not by
   comparing model fields: responses fetched from the running API must survive
   the frontend models unchanged.

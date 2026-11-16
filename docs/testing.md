@@ -1,18 +1,18 @@
 # Testing
 
-The repository has two kinds of tests:
+The repository has three kinds of tests:
 
 - **Unit tests** — `tests/unit/`, run by pytest locally and in CI. They need
   no running service: no Postgres, no Redis, no Celery broker, no LLM and no
   embedding API.
 - **Integration tests** — `tests/integration/`. They run against a real
-  Postgres with pgvector and a real Redis and check real objects end to end.
-  Most of them script the LLM's answers; the ones marked `llm` call the real
-  LLM and embedding API.
+  Postgres with pgvector and a real Redis and check real objects end to end;
+  the LLM's answers are scripted.
+- **End-to-end tests** — `tests/e2e/`. The same real services plus the real
+  LLM and embedding API. Run by hand only.
 
 Plain `uv run pytest` collects only the unit tests
-(`testpaths = ["tests/unit"]` in `pyproject.toml`), and tests marked `llm` are
-deselected unless asked for (`addopts = "-v -m 'not llm'"`).
+(`testpaths = ["tests/unit"]` in `pyproject.toml`).
 
 ## 1. Running
 
@@ -40,13 +40,13 @@ uv run pytest tests/integration
 | `TEST_DATABASE_URL` | `postgresql://user:password@localhost:5432/mas_test` |
 | `TEST_REDIS_URL` | `redis://localhost:6379/15` |
 
-Tests marked `llm` cost tokens and need the credentials from `.env` (see
+End-to-end tests cost tokens and need the credentials from `.env` (see
 `.env.example`) plus Application Default Credentials
 (`gcloud auth application-default login`). They are skipped without
 `GCP_PROJECT_ID` or `GEMINI_API_KEY`:
 
 ```bash
-uv run --env-file .env pytest tests/integration -m llm
+uv run --env-file .env pytest tests/e2e
 ```
 
 The database name must end in `_test` (every test empties all tables, so the
@@ -60,8 +60,7 @@ CI (`.github/workflows/tests.yaml`) runs on every push and pull request to
 
 - `unit-tests` — the unit tests.
 - `integration-tests` — the integration tests, against
-  `pgvector/pgvector:pg16` and `redis:7-alpine` service containers. Tests
-  marked `llm` are not run.
+  `pgvector/pgvector:pg16` and `redis:7-alpine` service containers.
 - `image-dependencies` — the backend, the worker and the frontend import with
   only the dependency groups their Docker images install.
 
@@ -139,15 +138,24 @@ imported by bare name, as they are inside the frontend container.
 
 ## 4. Integration tests
 
-Fixtures in `tests/integration/conftest.py`: `db_session` (the empty test
-database; production `get_session()` points at it too), `redis_db` (the debate
-cache on the test Redis) and `load_prices` (writes closes as a datalake file
-and loads them with `src/db/loaders.py`).
+Fixtures in `tests/conftest.py`, shared with the end-to-end tests:
+`db_session` (the empty test database; production `get_session()` points at
+it too), `redis_db` (the debate cache on the test Redis) and `load_prices`
+(writes closes as a datalake file and loads them with `src/db/loaders.py`).
 
 | File | What it checks |
 | --- | --- |
 | `test_frontend_backend.py` | The frontend's `BackendClient` against the FastAPI app served by uvicorn: tickers and the backtest window from the database, a debate started through the API and run by a Celery worker over Redis (the Critic disagrees once, so round 2 re-asks only Macro), status, history and result read back and turned into rounds by `debate_model`. Every response is also fetched raw and must survive the frontend models unchanged. Backend errors (unknown ticker, future date, unknown task) reach the frontend as `ApiError`. The LLM answers from a script. |
-| `test_debate_with_llm.py` (`llm`) | A fictional company written as datalake files and loaded with the real loaders (fundamentals, prices, FRED series, articles, one of them published after `as_of_date`); the articles are embedded with the real embedding API. The Financial agent answers from the database with one real LLM call; a full debate on the real LLM ends `DONE` with valid values, the protocol order in the Redis history, and no article from after `as_of_date` among the Sentiment agent's search results. Opinions are never checked, since the model is not deterministic. |
 | `test_point_in_time.py` | The point-in-time bounds of `src/db/queries.py` on a loaded datalake, day by day around each boundary: a report is visible from its `reported_date`, or from 90 days after its fiscal date when the date is missing, and `quarters` keeps the newest published quarters with all three statements; prices and macro values up to and including `as_of_date`; articles published until the end of `as_of_date` and never later, for recent articles, articles re-read by id, the count of missing vectors and the pgvector similarity search (also never another ticker's). |
 | `test_loading.py` | Loading the datalake twice with the real loaders: no duplicate rows and changed values updated; article vectors kept on reload, the title+summary vector reset when the title changed, both when the summary changed, and the next embedding run sends only the reset ones. |
 | `test_labels_from_database.py` | `build_labels` on prices loaded into Postgres: p0 is the close on `as_of` (or the last one before a weekend `as_of`), the path starts on the next session, the first barrier touched decides, a move after the vertical barrier is ignored, wider `k` turns a touch into HOLD, samples without enough prices are skipped with a reason. `sigma_h` is checked against pandas on the closes in calendar order, and the Portfolio Manager's prompt quotes the same band from the agents' own price query. |
+
+## 5. End-to-end tests
+
+Not run in CI (they cost tokens and need credentials); skipped without
+`GCP_PROJECT_ID` or `GEMINI_API_KEY`. They use the fixtures of the integration
+tests.
+
+| File | What it checks |
+| --- | --- |
+| `test_debate_with_llm.py` | A fictional company written as datalake files and loaded with the real loaders (fundamentals, prices, FRED series, articles, one of them published after `as_of_date`); the articles are embedded with the real embedding API. The Financial agent answers from the database with one real LLM call; a full debate on the real LLM ends `DONE` with valid values, the protocol order in the Redis history, and no article from after `as_of_date` among the Sentiment agent's search results. Opinions are never checked, since the model is not deterministic. |

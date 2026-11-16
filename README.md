@@ -97,7 +97,7 @@ docker compose up -d postgres redis
 uv run pytest tests/integration
 
 # tests on the real LLM (cost tokens, need the credentials from .env)
-uv run --env-file .env pytest tests/integration -m llm
+uv run --env-file .env pytest tests/e2e
 ```
 
 #### Available CLI Flags

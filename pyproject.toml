@@ -59,11 +59,7 @@ default-groups = ["dev", "frontend"]
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]
 pythonpath = ["."]
-# Tests marked `llm` call the real LLM (tokens, credentials): run them with -m llm.
-addopts = "-v -m 'not llm'"
-markers = [
-    "llm: calls the real LLM and embedding API; deselected unless run with -m llm",
-]
+addopts = "-v"
 
 # Coverage (`pytest --cov`): line and branch coverage of the project code.
 [tool.coverage.run]
