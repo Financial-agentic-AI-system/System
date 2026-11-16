@@ -87,9 +87,17 @@ for the cost are set in `.env` (`LLM_PRICE_INPUT_PER_M`, `LLM_PRICE_OUTPUT_PER_M
 
 Always use `uv` for running tasks to ensure consistency with the production environment:
 
-**Tests**:
+**Tests** (what each test checks, environment variables and CI: [docs/testing.md](docs/testing.md)):
 ```bash
+# unit tests, no services needed
 uv run pytest tests/unit
+
+# integration tests, on a real Postgres and Redis
+docker compose up -d postgres redis
+uv run pytest tests/integration
+
+# tests on the real LLM (cost tokens, need the credentials from .env)
+uv run --env-file .env pytest tests/integration -m llm
 ```
 
 #### Available CLI Flags

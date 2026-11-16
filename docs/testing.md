@@ -55,16 +55,17 @@ Redis uses its own logical database and flushes only that one. When a service
 cannot be reached the tests are skipped, or fail when the `CI` environment
 variable is set.
 
-CI (`.github/workflows/unit-tests.yaml`) runs on every push and pull request to
+CI (`.github/workflows/tests.yaml`) runs on every push and pull request to
 `main`, in three jobs:
 
-- `test` — the unit tests.
-- `integration-tests` — unit and integration tests together, against
-  `pgvector/pgvector:pg16` and `redis:7-alpine` service containers, with
-  coverage of both; the report is printed in the log and in the run's summary.
-  Tests marked `llm` are not run.
+- `unit-tests` — the unit tests.
+- `integration-tests` — the integration tests, against
+  `pgvector/pgvector:pg16` and `redis:7-alpine` service containers. Tests
+  marked `llm` are not run.
 - `image-dependencies` — the backend, the worker and the frontend import with
   only the dependency groups their Docker images install.
+
+Each of the two test jobs prints its own coverage report at the end of its log.
 
 ## 2. How external services are replaced
 

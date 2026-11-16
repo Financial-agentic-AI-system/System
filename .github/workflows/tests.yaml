@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Tests
 
 on:
   push:
@@ -7,7 +7,34 @@ on:
     branches: [ "main" ]
 
 jobs:
-  test:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv sync
+
+    - name: Run unit tests
+      run: |
+        uv run pytest tests/unit --cov --cov-report=term-missing
+
+  # Real Postgres (pgvector) and Redis; tests marked `llm` stay deselected.
+  integration-tests:
     runs-on: ubuntu-latest
 
     services:
@@ -43,9 +70,9 @@ jobs:
         uv venv
         uv sync
 
-    - name: Run tests
+    - name: Run integration tests
       run: |
-        uv run pytest tests --cov --cov-report=term-missing
+        uv run pytest tests/integration --cov --cov-report=term-missing
 
   # The Docker images install only some dependency groups. These checks fail
   # when code imports a package that lives in a group the image skips.
