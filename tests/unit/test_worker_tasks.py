@@ -1,97 +1,29 @@
 """Unit tests for src/worker/tasks.py — the Celery task that runs the debate
 graph and mirrors its progress into src/cache/debate_cache.py.
 
-Combines fixtures already established elsewhere: `_no_real_db` and
-`_make_fake_llm` (tests/unit/test_agents_graph.py) and `_fake_redis`
-(tests/unit/test_debate_cache.py). Tests call `execute_debate` directly — no
-Celery machinery involved — except one test that goes through the
-`@app.task` wrapper via `.apply()`, to prove the wrapping itself works.
+Tests call `execute_debate` directly — no Celery machinery involved — except
+the ones that go through the `@app.task` wrapper via `.apply()`, to prove the
+wrapping itself works.
 """
 
+import logging
 from datetime import date
 
-import fakeredis
 import pytest
 
-from src.agents import llm_client, nodes
-from src.agents.state import (
-    AgentReport,
-    CriticFeedback,
-    NextAgentsSelection,
-    PMOpinion,
-)
 from src.cache import debate_cache
 from src.worker import tasks
 
+pytestmark = pytest.mark.usefixtures("no_real_db", "fake_redis")
 
-class _FakeSessionCM:
-    def __enter__(self):
-        return None
-
-    def __exit__(self, *exc_info):
-        return False
+AS_OF = date(2025, 12, 30)
 
 
-@pytest.fixture(autouse=True)
-def _no_real_db(monkeypatch):
-    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
-    monkeypatch.setattr(nodes, "fetch_fundamentals", lambda *a, **k: [])
-    monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: [])
-    monkeypatch.setattr(nodes, "fetch_macro_series", lambda *a, **k: [])
-    monkeypatch.setattr(nodes, "fetch_recent_articles", lambda *a, **k: [])
-    monkeypatch.setattr(nodes, "fetch_articles_by_ids", lambda *a, **k: [])
-    # The Sentiment agent asks the model whether to search; "no search needed".
-    monkeypatch.setattr(
-        llm_client, "generate_tool_calls", lambda prompt, tools: [], raising=False
-    )
+def test_run_debate_happy_path_writes_status_result_history_and_log(fake_llm, caplog):
+    caplog.set_level(logging.INFO, logger="src.worker.tasks")
+    fake_llm(critic_agrees_after=0)
 
-
-@pytest.fixture(autouse=True)
-def _fake_redis(monkeypatch):
-    fake = fakeredis.FakeRedis(decode_responses=True)
-    monkeypatch.setattr(debate_cache, "redis_client", fake)
-    return fake
-
-
-def _make_fake_llm(
-    *,
-    critic_agrees_after: int,
-    selected_agents: list[str] | None = None,
-    fail_on: tuple[str, int] | None = None,
-):
-    """Same shape as test_agents_graph.py's helper, plus an optional
-    (schema_name, call_number) pair that makes that one call raise instead
-    of returning — used to exercise the FAILED status path.
-    """
-    counts: dict[str, int] = {}
-
-    def fake(prompt, output_model):
-        name = output_model.__name__
-        counts[name] = counts.get(name, 0) + 1
-        if fail_on is not None and (name, counts[name]) == fail_on:
-            raise RuntimeError("simulated permanent LLM failure")
-        if output_model is AgentReport:
-            return AgentReport(opinion="op", reasoning="rsn")
-        if output_model is PMOpinion:
-            return PMOpinion(
-                direction="BUY", confidence=0.6, summary="s", arguments=["a"]
-            )
-        if output_model is CriticFeedback:
-            agree = counts["CriticFeedback"] > critic_agrees_after
-            return CriticFeedback(agree=agree, feedback="fb")
-        if output_model is NextAgentsSelection:
-            return NextAgentsSelection(agents=selected_agents or ["macro"])
-        raise AssertionError(f"unexpected model {output_model}")
-
-    fake.counts = counts
-    return fake
-
-
-def test_run_debate_happy_path_writes_done_status_result_and_history(monkeypatch):
-    fake_llm = _make_fake_llm(critic_agrees_after=0)
-    monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
-
-    result = tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+    result = tasks.execute_debate("AAPL", "1W", AS_OF, task_id="t1")
 
     assert result.direction == "BUY"
     assert result.rounds_used == 1
@@ -101,8 +33,7 @@ def test_run_debate_happy_path_writes_done_status_result_and_history(monkeypatch
     assert status.round_number == 1
     assert status.current_node == "finalize"
 
-    fetched_result = debate_cache.get_result("t1")
-    assert fetched_result.direction == "BUY"
+    assert debate_cache.get_result("t1").direction == "BUY"
 
     history = debate_cache.get_history("t1")
     # financial/sentiment/macro run in parallel — order among the three
@@ -111,12 +42,15 @@ def test_run_debate_happy_path_writes_done_status_result_and_history(monkeypatch
     assert [h.node for h in history[3:]] == ["pm_synthesize", "critic", "finalize"]
     assert all(h.round_number == 1 for h in history)
 
+    assert "debate t1 AAPL 1W as of 2025-12-30 started" in caplog.text
+    assert "debate t1 AAPL 1W as of 2025-12-30 done: BUY, confidence 60%" in caplog.text
+    assert "LLM call(s)" in caplog.text
 
-def test_run_debate_partial_reask_tags_round_2_entries(monkeypatch):
-    fake_llm = _make_fake_llm(critic_agrees_after=1, selected_agents=["macro"])
-    monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
 
-    result = tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+def test_run_debate_partial_reask_tags_round_2_entries(fake_llm):
+    fake_llm(critic_agrees_after=1, selected_agents=["macro"])
+
+    result = tasks.execute_debate("AAPL", "1W", AS_OF, task_id="t1")
 
     assert result.rounds_used == 2
 
@@ -133,18 +67,14 @@ def test_run_debate_partial_reask_tags_round_2_entries(monkeypatch):
     ]
     assert [h.round_number for h in history] == [1, 1, 1, 1, 1, 2, 2, 2, 2, 2]
 
-    status = debate_cache.get_status("t1")
-    assert status.round_number == 2
+    assert debate_cache.get_status("t1").round_number == 2
 
 
-def test_run_debate_marks_failed_on_exception_and_preserves_partial_history(
-    monkeypatch,
-):
-    fake_llm = _make_fake_llm(critic_agrees_after=0, fail_on=("CriticFeedback", 1))
-    monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
+def test_run_debate_marks_failed_on_exception_and_preserves_partial_history(fake_llm):
+    fake_llm(critic_agrees_after=0, fail_on=("CriticFeedback", 1))
 
     with pytest.raises(RuntimeError):
-        tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
+        tasks.execute_debate("AAPL", "1W", AS_OF, task_id="t1")
 
     status = debate_cache.get_status("t1")
     assert status.status == "FAILED"
@@ -158,18 +88,14 @@ def test_run_debate_marks_failed_on_exception_and_preserves_partial_history(
     assert debate_cache.get_result("t1") is None
 
 
-def test_run_debate_task_wraps_correctly(monkeypatch):
-    fake_llm = _make_fake_llm(critic_agrees_after=0)
-    monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
+def test_run_debate_task_wraps_correctly(fake_llm):
+    fake_llm(critic_agrees_after=0)
 
-    async_result = tasks.run_debate.apply(args=["AAPL", "1W", date(2025, 12, 30)])
+    async_result = tasks.run_debate.apply(args=["AAPL", "1W", AS_OF])
 
     assert async_result.successful()
-    payload = async_result.result
-    assert payload["direction"] == "BUY"
-
-    status = debate_cache.get_status(async_result.id)
-    assert status.status == "DONE"
+    assert async_result.result["direction"] == "BUY"
+    assert debate_cache.get_status(async_result.id).status == "DONE"
 
 
 def test_run_debate_task_accepts_iso_string_date(monkeypatch):
@@ -189,18 +115,4 @@ def test_run_debate_task_accepts_iso_string_date(monkeypatch):
 
     tasks.run_debate.apply(args=["AAPL", "1W", "2025-12-30"])
 
-    assert seen["as_of_date"] == date(2025, 12, 30)
-
-
-def test_run_debate_logs_a_summary(monkeypatch, caplog):
-    import logging
-
-    caplog.set_level(logging.INFO, logger="src.worker.tasks")
-    fake_llm = _make_fake_llm(critic_agrees_after=0)
-    monkeypatch.setattr(llm_client, "generate_structured", fake_llm, raising=False)
-
-    tasks.execute_debate("AAPL", "1W", date(2025, 12, 30), task_id="t1")
-
-    assert "debate t1 AAPL 1W as of 2025-12-30 started" in caplog.text
-    assert "debate t1 AAPL 1W as of 2025-12-30 done: BUY, confidence 60%" in caplog.text
-    assert "LLM call(s)" in caplog.text
+    assert seen["as_of_date"] == AS_OF

@@ -1,13 +1,9 @@
 """Unit tests for frontend/debate_model.py — pure logic, no Streamlit."""
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "frontend"))
-
-from debate_model import build_rounds, describe_progress, stage_states  # noqa: E402
-from models import DebateStatus, HistoryEntry  # noqa: E402
+from debate_model import build_rounds, describe_progress, stage_states
+from models import DebateStatus, HistoryEntry
 
 TS = datetime(2026, 1, 15, tzinfo=timezone.utc)
 
@@ -39,10 +35,6 @@ def _running() -> DebateStatus:
     return DebateStatus(status="RUNNING", round_number=1, max_rounds=3)
 
 
-def test_build_rounds_empty():
-    assert build_rounds([]) == []
-
-
 def test_build_rounds_two_round_debate_with_partial_reask():
     history = [
         _entry("financial", 1, {"financial_report": _report()}),
@@ -57,6 +49,7 @@ def test_build_rounds_two_round_debate_with_partial_reask():
         _entry("critic", 2, _critic(True)),
         _entry("finalize", 2, {"final_result": {}}),
     ]
+    assert build_rounds([]) == []
     rounds = build_rounds(history)
 
     assert [r.number for r in rounds] == [1, 2]

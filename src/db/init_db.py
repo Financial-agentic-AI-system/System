@@ -4,7 +4,7 @@ Run:
     python -m src.db.init_db
 """
 
-from sqlalchemy import text
+from sqlalchemy import Engine, text
 
 from src.db import models  # noqa: F401  (registers tables in metadata)
 from src.db.base import Base
@@ -23,12 +23,16 @@ _ADDED_COLUMNS: tuple[str, ...] = (
 )
 
 
-def init_db() -> None:
-    """Create the pgvector extension, all tables, and any later-added columns."""
-    with engine.begin() as connection:
+def init_db(bind: Engine = engine) -> None:
+    """Create the pgvector extension, all tables, and any later-added columns.
+
+    `bind` defaults to the application database; the integration tests pass
+    their own engine.
+    """
+    with bind.begin() as connection:
         connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    Base.metadata.create_all(bind=engine)
-    with engine.begin() as connection:
+    Base.metadata.create_all(bind=bind)
+    with bind.begin() as connection:
         for statement in _ADDED_COLUMNS:
             connection.execute(text(statement))
 

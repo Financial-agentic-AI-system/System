@@ -28,40 +28,19 @@ from src.db import loaders
     ],
 )
 def test_clean_value(raw, expected):
-    assert loaders.clean_value(raw) == expected
-
-
-def test_clean_value_types():
-    assert isinstance(loaders.clean_value("100"), int)
-    assert isinstance(loaders.clean_value("1.5"), float)
-
-
-def test_clean_report_normalizes_none_and_numbers():
-    report = {
-        "fiscalDateEnding": "2025-12-31",
-        "reportedCurrency": "USD",
-        "totalAssets": "379297000000",
-        "goodwill": "None",
-    }
-    cleaned = loaders.clean_report(report)
-    assert cleaned == {
-        "fiscalDateEnding": "2025-12-31",
-        "reportedCurrency": "USD",
-        "totalAssets": 379297000000,
-        "goodwill": None,
-    }
+    cleaned = loaders.clean_value(raw)
+    assert cleaned == expected
+    assert type(cleaned) is type(expected)  # "100" -> int, "1.5" -> float
 
 
 # --------------------------------------------------------------------------- #
 # date parsing
 # --------------------------------------------------------------------------- #
-def test_parse_date():
+def test_date_parsers():
     assert loaders.parse_date("2010-01-04") == dt.date(2010, 1, 4)
     assert loaders.parse_date("None") is None
     assert loaders.parse_date(None) is None
 
-
-def test_parse_time_published():
     assert loaders.parse_time_published("20250101T093000") == dt.datetime(
         2025, 1, 1, 9, 30, 0
     )
@@ -86,6 +65,7 @@ def raw_data(tmp_path: Path) -> Path:
                     {
                         "fiscalDateEnding": "2025-12-31",
                         "reportedDate": "2026-01-29",
+                        "reportedCurrency": "USD",
                         "totalAssets": "379297000000",
                         "goodwill": "None",
                     }
@@ -147,9 +127,13 @@ def test_iter_fundamentals(raw_data: Path):
     assert row["period"] == "quarterly"
     assert row["fiscal_date"] == dt.date(2025, 12, 31)
     assert row["reported_date"] == dt.date(2026, 1, 29)
-    assert "reportedDate" not in row["data"]
-    assert row["data"]["totalAssets"] == 379297000000
-    assert row["data"]["goodwill"] is None
+    # `data` is the cleaned report (clean_report): numbers parsed, "None" -> None
+    assert row["data"] == {
+        "fiscalDateEnding": "2025-12-31",
+        "reportedCurrency": "USD",
+        "totalAssets": 379297000000,
+        "goodwill": None,
+    }
 
 
 def test_iter_stock_prices_skips_bad_rows(raw_data: Path):

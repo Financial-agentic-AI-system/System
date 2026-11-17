@@ -1,11 +1,9 @@
-"""Unit tests for src/agents/nodes.py.
+"""Unit tests for src/agents/nodes.py and src/agents/volatility.py.
 
-Convention (matches tests/unit/test_db_loaders.py): no real database and no
-real LLM calls here. `fetch_*` now lives in `src/db/queries.py` and is
-verified manually against a running Postgres, not here. `render_prompt` and
-`llm_client.generate_structured` are monkeypatched so these tests only check
-each node's own logic: which
-prompt key it picks, what it passes, and which state key it returns.
+No real database and no real LLM calls here (`no_real_db`). `render_prompt` and
+`llm_client.generate_structured` are replaced by the `run_node` fixture, so
+these tests only check each node's own logic: which prompt key it picks, what
+it passes, and which state key it returns.
 """
 
 from datetime import date
@@ -17,51 +15,41 @@ from src.agents import llm_client, nodes
 from src.agents.state import (
     AgentReport,
     CriticFeedback,
-    DebateState,
     NextAgentsSelection,
     PMOpinion,
     PredictResult,
 )
+from src.agents.volatility import ewm_std, horizon_sigma
 from src.db.models import Fundamentals, MacroSeries
 
+pytestmark = pytest.mark.usefixtures("no_real_db")
 
-# --------------------------------------------------------------------------- #
-# Test helpers
-# --------------------------------------------------------------------------- #
-def _base_state(round_number: int = 1, **overrides) -> DebateState:
-    state: DebateState = {
-        "ticker": "TSLA",
-        "horizon": "1W",
-        "as_of_date": date(2025, 1, 1),
-        "round_number": round_number,
-        "active_agents": ["financial", "sentiment", "macro"],
-        "financial_report": None,
-        "sentiment_report": None,
-        "macro_report": None,
-        "sentiment_queries": [],
-        "sentiment_sources": [],
-        "pm_opinion": None,
-        "critic_feedback": None,
-        "final_result": None,
-    }
-    state.update(overrides)
-    return state
+REPORT = AgentReport(opinion="x", reasoning="y")
+OPINION = PMOpinion(direction="BUY", confidence=0.8, summary="s", arguments=["a"])
+DISAGREE = CriticFeedback(agree=False, feedback="not enough evidence")
+# alternating +1% / -1% closes (newest first) -> non-zero daily sigma
+CLOSES = [100.0 * (1.01 if i % 2 else 1.0) for i in range(30)]
 
 
-class _FakeSessionCM:
-    def __enter__(self):
-        return None
+@pytest.fixture
+def run_node(monkeypatch):
+    """Run a node with the LLM answering `answer`; returns the node's result
+    and the `render_prompt` calls it made."""
 
-    def __exit__(self, *exc_info):
-        return False
+    def run(node, state, answer):
+        calls: list[dict] = []
 
+        def fake_render(name, key="system_prompt", **kwargs):
+            calls.append({"name": name, "key": key, "kwargs": kwargs})
+            return f"PROMPT[{name}.{key}]"
 
-def _fake_render_prompt(calls: list[dict]):
-    def fake(name, key="system_prompt", **kwargs):
-        calls.append({"name": name, "key": key, "kwargs": kwargs})
-        return f"PROMPT[{name}.{key}]"
+        monkeypatch.setattr(nodes, "render_prompt", fake_render)
+        monkeypatch.setattr(
+            llm_client, "generate_structured", lambda prompt, model: answer
+        )
+        return node(state), calls
 
-    return fake
+    return run
 
 
 # --------------------------------------------------------------------------- #
@@ -77,9 +65,6 @@ def test_format_fundamentals_context_drops_none_and_formats_key_value():
         nodes.format_fundamentals_context([row])
         == "BALANCE_SHEET (2025-09-30): totalAssets=100"
     )
-
-
-def test_format_fundamentals_context_empty():
     assert nodes.format_fundamentals_context([]) == "No fundamentals data available."
 
 
@@ -90,271 +75,143 @@ def test_format_macro_context_shows_latest_vs_earliest_trend():
         MacroSeries(series_id="GDP", date=date(2020, 4, 1), value=80.0),
         MacroSeries(series_id="UNRATE", date=date(2025, 6, 1), value=4.0),
     ]
-    result = nodes.format_macro_context(rows)
-    assert (
-        "GDP: 100.0 as of 2025-07-01 (was 80.0 on 2020-04-01, change +20.00)" in result
-    )
     # UNRATE has a single point in the window — no "was/change" clause.
-    assert "UNRATE: 4.0 as of 2025-06-01" in result
-    assert "UNRATE: 4.0 as of 2025-06-01 (was" not in result
+    assert nodes.format_macro_context(rows) == (
+        "GDP: 100.0 as of 2025-07-01 (was 80.0 on 2020-04-01, change +20.00)\n"
+        "UNRATE: 4.0 as of 2025-06-01"
+    )
 
 
-def test_format_macro_context_single_point_series_has_no_change_clause():
-    rows = [MacroSeries(series_id="GDP", date=date(2025, 7, 1), value=100.0)]
-    assert nodes.format_macro_context(rows) == "GDP: 100.0 as of 2025-07-01"
-
-
-def test_format_report_none_vs_value():
+def test_format_report_and_opinion_none_vs_value():
     assert nodes.format_report(None) == "(no report yet)"
-    report = AgentReport(opinion="BUY-ish", reasoning="strong revenue")
-    assert "BUY-ish" in nodes.format_report(report)
-    assert "strong revenue" in nodes.format_report(report)
+    rendered = nodes.format_report(AgentReport(opinion="BUY-ish", reasoning="strong"))
+    assert "BUY-ish" in rendered and "strong" in rendered
 
-
-def test_format_opinion_none_vs_value():
     assert nodes.format_opinion(None) == "(no opinion yet)"
-    opinion = PMOpinion(
-        direction="HOLD", confidence=0.5, summary="mixed", arguments=["a", "b"]
+    rendered = nodes.format_opinion(
+        PMOpinion(
+            direction="HOLD", confidence=0.5, summary="mixed", arguments=["a", "b"]
+        )
     )
-    rendered = nodes.format_opinion(opinion)
-    assert "HOLD" in rendered
-    assert "mixed" in rendered
-    assert "a" in rendered and "b" in rendered
+    assert "HOLD" in rendered and "mixed" in rendered and "a; b" in rendered
 
 
 # --------------------------------------------------------------------------- #
-# Worker agent nodes — DB fetch + prompt-key branching + LLM call, all mocked
+# Worker agent nodes — prompt-key branching + LLM call
 # --------------------------------------------------------------------------- #
-def test_financial_agent_node_round1_uses_system_prompt(monkeypatch):
-    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
-    monkeypatch.setattr(nodes, "fetch_fundamentals", lambda *a, **k: [])
-    monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: [])
+@pytest.mark.parametrize(
+    ("node", "prompt_name", "report_key"),
+    [
+        (nodes.financial_agent_node, "financial_agent", "financial_report"),
+        (nodes.macro_agent_node, "macro_agent", "macro_report"),
+    ],
+)
+def test_agent_node_picks_prompt_by_round(
+    run_node, debate_state, node, prompt_name, report_key
+):
+    result, calls = run_node(node, debate_state(), REPORT)
 
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
+    assert result == {report_key: REPORT}
+    assert (calls[0]["name"], calls[0]["key"]) == (prompt_name, "system_prompt")
 
-    fake_report = AgentReport(opinion="x", reasoning="y")
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_report,
-        raising=False,
+    previous = AgentReport(opinion="old", reasoning="old-r")
+    state = debate_state(
+        round_number=2, critic_feedback=DISAGREE, **{report_key: previous}
     )
+    result, calls = run_node(node, state, REPORT)
 
-    result = nodes.financial_agent_node(_base_state(round_number=1))
-
-    assert result == {"financial_report": fake_report}
-    assert render_calls[0]["name"] == "financial_agent"
-    assert render_calls[0]["key"] == "system_prompt"
-
-
-def test_financial_agent_node_round2_uses_revision_prompt(monkeypatch):
-    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
-    monkeypatch.setattr(nodes, "fetch_fundamentals", lambda *a, **k: [])
-    monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: [])
-
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-
-    fake_report = AgentReport(opinion="x2", reasoning="y2")
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_report,
-        raising=False,
-    )
-
-    state = _base_state(
-        round_number=2,
-        critic_feedback=CriticFeedback(agree=False, feedback="not enough evidence"),
-        financial_report=AgentReport(opinion="old", reasoning="old-r"),
-    )
-    result = nodes.financial_agent_node(state)
-
-    assert result == {"financial_report": fake_report}
-    call = render_calls[0]
-    assert call["key"] == "revision_prompt"
-    assert call["kwargs"]["critic_feedback"] == "not enough evidence"
-    assert "old" in call["kwargs"]["previous_opinion"]
+    assert result == {report_key: REPORT}
+    assert calls[0]["key"] == "revision_prompt"
+    assert calls[0]["kwargs"]["critic_feedback"] == "not enough evidence"
+    assert "old" in calls[0]["kwargs"]["previous_opinion"]
 
 
-def test_sentiment_agent_node_round1_uses_system_prompt(monkeypatch):
-    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
-    monkeypatch.setattr(nodes, "fetch_recent_articles", lambda *a, **k: [])
-    monkeypatch.setattr(nodes, "fetch_articles_by_ids", lambda *a, **k: [])
-    # The model declines to search: no queries, so the retriever is never reached.
-    monkeypatch.setattr(
-        llm_client, "generate_tool_calls", lambda prompt, tools: [], raising=False
-    )
-
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-
-    fake_report = AgentReport(opinion="x", reasoning="y")
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_report,
-        raising=False,
-    )
-
-    result = nodes.sentiment_agent_node(_base_state(round_number=1))
+def test_sentiment_agent_node_round1_without_search(run_node, debate_state):
+    # `no_real_db`: the model declines to search, so the retriever is not reached.
+    result, calls = run_node(nodes.sentiment_agent_node, debate_state(), REPORT)
 
     assert result == {
-        "sentiment_report": fake_report,
+        "sentiment_report": REPORT,
         "sentiment_queries": [],
         "sentiment_sources": [],
     }
     # Two prompts per round: the one that lets the model ask for a search, then
     # the one that produces the opinion.
-    assert [c["name"] for c in render_calls] == ["sentiment_agent"] * 2
-    assert [c["key"] for c in render_calls] == ["search_prompt", "system_prompt"]
-
-
-def test_macro_agent_node_round2_uses_revision_prompt(monkeypatch):
-    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
-    monkeypatch.setattr(nodes, "fetch_macro_series", lambda *a, **k: [])
-
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-
-    fake_report = AgentReport(opinion="x", reasoning="y")
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_report,
-        raising=False,
-    )
-
-    state = _base_state(
-        round_number=2,
-        critic_feedback=CriticFeedback(agree=False, feedback="check rates again"),
-        macro_report=AgentReport(opinion="old-macro", reasoning="old-r"),
-    )
-    result = nodes.macro_agent_node(state)
-
-    assert result == {"macro_report": fake_report}
-    call = render_calls[0]
-    assert call["key"] == "revision_prompt"
-    assert call["kwargs"]["critic_feedback"] == "check rates again"
+    assert [c["name"] for c in calls] == ["sentiment_agent"] * 2
+    assert [c["key"] for c in calls] == ["search_prompt", "system_prompt"]
 
 
 # --------------------------------------------------------------------------- #
-# PM / Critic nodes — no DB at all, only LLM call
+# PM / Critic nodes
 # --------------------------------------------------------------------------- #
-def _patch_pm_prices(monkeypatch, closes_desc=()):
-    monkeypatch.setattr(nodes, "get_session", lambda: _FakeSessionCM())
-    rows = [SimpleNamespace(close=c) for c in closes_desc]
+def test_pm_synthesize_node_first_round_uses_initial_prompt_with_hold_band(
+    run_node, debate_state, monkeypatch
+):
+    rows = [SimpleNamespace(close=c) for c in CLOSES]
     monkeypatch.setattr(nodes, "fetch_prices", lambda *a, **k: rows)
 
+    result, calls = run_node(nodes.pm_synthesize_node, debate_state(), OPINION)
 
-def test_pm_synthesize_node_first_round_uses_initial_prompt(monkeypatch):
-    _patch_pm_prices(monkeypatch)
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-    fake_opinion = PMOpinion(
-        direction="BUY", confidence=0.8, summary="s", arguments=["a"]
+    assert result == {"pm_opinion": OPINION}
+    assert (calls[0]["name"], calls[0]["key"]) == (
+        "portfolio_manager",
+        "initial_prompt",
     )
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_opinion,
-        raising=False,
-    )
-
-    result = nodes.pm_synthesize_node(_base_state(round_number=1))
-
-    assert result == {"pm_opinion": fake_opinion}
-    assert render_calls[0]["name"] == "portfolio_manager"
-    assert render_calls[0]["key"] == "initial_prompt"
+    kwargs = calls[0]["kwargs"]
+    assert kwargs["horizon_long"].startswith("1 week")
+    assert kwargs["band_pct"].endswith("%")
+    assert kwargs["vol_span"] == 100
 
 
-def test_pm_synthesize_node_later_round_uses_revision_prompt(monkeypatch):
-    _patch_pm_prices(monkeypatch)
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-    fake_opinion = PMOpinion(
-        direction="SELL", confidence=0.6, summary="s2", arguments=["b"]
-    )
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_opinion,
-        raising=False,
-    )
-
-    state = _base_state(
+def test_pm_synthesize_node_later_round_uses_revision_prompt(run_node, debate_state):
+    state = debate_state(
         round_number=2,
-        pm_opinion=PMOpinion(
-            direction="BUY", confidence=0.8, summary="prev", arguments=["a"]
-        ),
-        critic_feedback=CriticFeedback(agree=False, feedback="too optimistic"),
+        pm_opinion=OPINION,
+        critic_feedback=DISAGREE,
         active_agents=["macro"],
     )
-    result = nodes.pm_synthesize_node(state)
+    revised = PMOpinion(direction="SELL", confidence=0.6, summary="s2", arguments=["b"])
 
-    assert result == {"pm_opinion": fake_opinion}
-    call = render_calls[0]
-    assert call["key"] == "revision_prompt"
-    assert call["kwargs"]["critic_feedback"] == "too optimistic"
-    assert call["kwargs"]["reasked_agents"] == "macro"
+    result, calls = run_node(nodes.pm_synthesize_node, state, revised)
+
+    assert result == {"pm_opinion": revised}
+    kwargs = calls[0]["kwargs"]
+    assert calls[0]["key"] == "revision_prompt"
+    assert kwargs["critic_feedback"] == "not enough evidence"
+    assert kwargs["reasked_agents"] == "macro"
+    # no prices in the database: the band falls back to words
+    assert kwargs["band_pct"] == "its typical volatility"
 
 
 def test_pm_select_next_agents_node_increments_round_and_sets_active_agents(
-    monkeypatch,
+    run_node, debate_state
 ):
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-    fake_selection = NextAgentsSelection(agents=["macro"])
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_selection,
-        raising=False,
-    )
+    state = debate_state(pm_opinion=OPINION, critic_feedback=DISAGREE)
 
-    state = _base_state(
-        round_number=1,
-        pm_opinion=PMOpinion(
-            direction="BUY", confidence=0.8, summary="s", arguments=["a"]
-        ),
-        critic_feedback=CriticFeedback(agree=False, feedback="check macro"),
+    result, calls = run_node(
+        nodes.pm_select_next_agents_node, state, NextAgentsSelection(agents=["macro"])
     )
-    result = nodes.pm_select_next_agents_node(state)
 
     assert result == {"active_agents": ["macro"], "round_number": 2}
-    assert render_calls[0]["name"] == "portfolio_manager"
-    assert render_calls[0]["key"] == "select_agents_prompt"
-
-
-def test_critic_node_returns_feedback(monkeypatch):
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-    fake_feedback = CriticFeedback(agree=True, feedback="looks solid")
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: fake_feedback,
-        raising=False,
+    assert (calls[0]["name"], calls[0]["key"]) == (
+        "portfolio_manager",
+        "select_agents_prompt",
     )
 
-    state = _base_state(
-        round_number=1,
-        pm_opinion=PMOpinion(
-            direction="BUY", confidence=0.8, summary="s", arguments=["a"]
-        ),
+
+def test_critic_node_returns_feedback(run_node, debate_state):
+    feedback = CriticFeedback(agree=True, feedback="looks solid")
+
+    result, calls = run_node(
+        nodes.critic_node, debate_state(pm_opinion=OPINION), feedback
     )
-    result = nodes.critic_node(state)
 
-    assert result == {"critic_feedback": fake_feedback}
-    assert render_calls[0]["name"] == "critic"
+    assert result == {"critic_feedback": feedback}
+    assert calls[0]["name"] == "critic"
 
 
-# --------------------------------------------------------------------------- #
-# finalize_node — pure, no LLM, no DB
-# --------------------------------------------------------------------------- #
-def test_finalize_node_assembles_predict_result():
-    state = _base_state(
+def test_finalize_node_assembles_predict_result(debate_state):
+    state = debate_state(
         round_number=2,
         pm_opinion=PMOpinion(
             direction="BUY", confidence=0.7, summary="s", arguments=["a"]
@@ -365,9 +222,8 @@ def test_finalize_node_assembles_predict_result():
         macro_report=AgentReport(opinion="m-op", reasoning="m-r"),
     )
 
-    result = nodes.finalize_node(state)
+    final = nodes.finalize_node(state)["final_result"]
 
-    final = result["final_result"]
     assert isinstance(final, PredictResult)
     assert final.direction == "BUY"
     assert final.confidence == 0.7
@@ -378,42 +234,18 @@ def test_finalize_node_assembles_predict_result():
     assert final.agent_reports.macro.opinion == "m-op"
 
 
-def test_pm_prompt_gets_hold_band_from_volatility(monkeypatch):
-    # alternating +1% / -1% closes (newest first) -> non-zero daily sigma
-    closes = [100.0 * (1.01 if i % 2 else 1.0) for i in range(30)]
-    _patch_pm_prices(monkeypatch, closes)
-    render_calls: list[dict] = []
-    monkeypatch.setattr(nodes, "render_prompt", _fake_render_prompt(render_calls))
-    monkeypatch.setattr(
-        llm_client,
-        "generate_structured",
-        lambda prompt, model: PMOpinion(
-            direction="HOLD", confidence=0.5, summary="s", arguments=["a"]
-        ),
-        raising=False,
-    )
-
-    nodes.pm_synthesize_node(_base_state(round_number=1))
-
-    kwargs = render_calls[0]["kwargs"]
-    assert kwargs["horizon_long"].startswith("1 week")
-    assert kwargs["band_pct"].endswith("%")
-    assert kwargs["vol_span"] == 100
-
-
+# --------------------------------------------------------------------------- #
+# volatility — the band shared by the PM prompt and the backtest labels
+# --------------------------------------------------------------------------- #
 def test_horizon_sigma_scales_with_sqrt_of_sessions():
-    from src.agents.volatility import horizon_sigma
-
-    closes = [100.0 * (1.01 if i % 2 else 1.0) for i in range(30)]
-    one_week = horizon_sigma(closes, "1W")
-    one_month = horizon_sigma(closes, "1M")
+    one_week = horizon_sigma(CLOSES, "1W")
+    one_month = horizon_sigma(CLOSES, "1M")
     assert one_month / one_week == pytest.approx((21 / 5) ** 0.5)
     assert horizon_sigma([100.0], "1W") is None
 
 
 def test_ewm_std_matches_pandas():
     pd = pytest.importorskip("pandas")
-    from src.agents.volatility import ewm_std
 
     returns_desc = [0.01, -0.02, 0.015, 0.003, -0.007, 0.02, -0.011] * 20
     expected = pd.Series(returns_desc[::-1]).ewm(span=100).std().iloc[-1]
