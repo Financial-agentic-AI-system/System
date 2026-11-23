@@ -1,0 +1,112 @@
+name: Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv sync
+
+    - name: Run unit tests
+      run: |
+        uv run pytest tests/unit --cov --cov-report=term-missing
+
+  # Real Postgres (pgvector) and Redis; tests marked `llm` stay deselected.
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: mas_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U user" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv sync
+
+    - name: Start the backtest proxy
+      run: |
+        docker run -d --name backtest-proxy -p 8888:8888 \
+          -v "$PWD/docker/backtest-proxy/squid.conf:/etc/squid/squid.conf:ro" \
+          ubuntu/squid:latest
+        for i in $(seq 30); do nc -z localhost 8888 && break; sleep 1; done
+
+    - name: Run integration tests
+      run: |
+        uv run pytest tests/integration --cov --cov-report=term-missing
+
+  # The Docker images install only some dependency groups. These checks fail
+  # when code imports a package that lives in a group the image skips.
+  image-dependencies:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+
+    - name: Backend and worker start without dev/frontend groups
+      run: |
+        uv sync --frozen --no-default-groups
+        uv run --no-sync python -c "import src.api.v1.main, src.worker.tasks"
+
+    - name: Frontend starts with only its own group
+      run: |
+        uv sync --frozen --no-install-project --only-group frontend
+        cd frontend
+        uv run --no-sync python -c "import config, models, api_client, debate_model, components"

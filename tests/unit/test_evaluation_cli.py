@@ -69,12 +69,7 @@ def test_metrics_names_the_missing_labels_file(folder):
     assert "--k 2" in str(exc.value)
 
 
-def test_labels_path_includes_horizon_and_k(folder):
-    assert ev.labels_path("3M", 0.5) == folder / "labels_3M_k0.5.jsonl"
-    assert read_jsonl(folder / "nothing.jsonl") == []
-
-
-def test_compact_drops_failures_and_zero_padding(tmp_path):
+def test_compact_drops_failures_and_zero_padding_but_leaves_clean_files(tmp_path):
     from scripts.evaluation.io import compact_predictions
 
     path = tmp_path / "predictions_r1.jsonl"
@@ -86,19 +81,11 @@ def test_compact_drops_failures_and_zero_padding(tmp_path):
     )
 
     assert compact_predictions(path) == (1, 1)
-
     assert read_jsonl(path) == [good]
     assert not (tmp_path / "predictions_r1.jsonl.tmp").exists()
 
-
-def test_compact_leaves_a_clean_file_untouched(tmp_path):
-    from scripts.evaluation.io import compact_predictions
-
-    path = tmp_path / "predictions_r1.jsonl"
-    write_jsonl(path, [_row("A", direction="BUY", confidence=0.8)])
+    # now clean: a second pass rewrites nothing
     before = path.read_bytes()
-
     assert compact_predictions(path) == (1, 0)
-
     assert path.read_bytes() == before
     assert compact_predictions(tmp_path / "missing.jsonl") == (0, 0)

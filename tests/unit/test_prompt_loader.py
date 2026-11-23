@@ -6,32 +6,20 @@ from src.agents import prompt_loader
 from src.agents.prompt_loader import render_prompt
 
 
-def test_render_prompt_substitutes_placeholders():
-    rendered = render_prompt(
-        "financial_agent",
+def test_render_prompt_substitutes_placeholders_and_defaults_to_system_prompt():
+    kwargs = dict(
         ticker="TSLA",
         as_of_date="2025-01-01",
         horizon="1W",
         fundamentals_context="FUND_X",
         price_context="PRICE_Y",
     )
+    rendered = render_prompt("financial_agent", **kwargs)
     assert "TSLA" in rendered
     assert "FUND_X" in rendered
     assert "PRICE_Y" in rendered
     assert "{" not in rendered  # no leftover placeholder
-
-
-def test_render_prompt_default_key_is_system_prompt():
-    kwargs = dict(
-        ticker="TSLA",
-        as_of_date="2025-01-01",
-        horizon="1W",
-        fundamentals_context="x",
-        price_context="y",
-    )
-    assert render_prompt("financial_agent", **kwargs) == render_prompt(
-        "financial_agent", key="system_prompt", **kwargs
-    )
+    assert rendered == render_prompt("financial_agent", key="system_prompt", **kwargs)
 
 
 def test_render_prompt_missing_key_raises_with_available_keys_listed():
