@@ -51,6 +51,17 @@ frontend = [
     "pydantic",
     "tzdata"
 ]
+# Kronos baseline (scripts/evaluation/kronos_baseline.py), with the model code
+# cloned into third_party/Kronos. Not in any Docker image or in CI.
+kronos = [
+    "torch>=2.0",
+    "einops==0.8.1",
+    "huggingface_hub>=0.33",
+    "safetensors",
+    "tqdm",
+    "numpy",
+    "pandas",
+]
 
 [tool.uv]
 default-groups = ["dev", "frontend"]
@@ -79,7 +90,8 @@ exclude = [
     ".git",
     "__pycache__",
     "datalake",
-    "notebooks"
+    "notebooks",
+    "third_party"
 ]
 
 [tool.ruff.lint]
